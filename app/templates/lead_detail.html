@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ lead.name }} · {{ app_name }}{% endblock %}
+{% block content %}
+  <section class="detail-page">
+    <a class="back-link" href="/">← Все лиды</a>
+    <div class="detail-header">
+      <div class="avatar avatar-large">{{ lead.name[0]|upper }}</div>
+      <div>
+        <p class="eyebrow">Лид #{{ lead.id }}</p>
+        <h1>{{ lead.name }}</h1>
+        <p class="subtitle">{{ lead.contact }}</p>
+      </div>
+    </div>
+
+    <div class="detail-grid">
+      <section class="panel">
+        <h2>Запрос</h2>
+        <p class="request-text">{{ lead.request_text }}</p>
+      </section>
+      <aside class="panel">
+        <h2>Теги</h2>
+        <div class="tags editable-tags">
+          {% for tag in lead.tags %}
+            <form action="/leads/{{ lead.id }}/tags/{{ tag.id }}/delete" method="post">
+              <button class="tag tag-remove" title="Удалить тег">{{ tag.name }} ×</button>
+            </form>
+          {% else %}
+            <p class="muted">Тегов пока нет.</p>
+          {% endfor %}
+        </div>
+        <form class="tag-form" action="/leads/{{ lead.id }}/tags" method="post">
+          <input name="tag" maxlength="80" required placeholder="Добавить тег">
+          <button class="button button-secondary" type="submit">Добавить</button>
+        </form>
+        <dl class="facts">
+          <div><dt>Источник</dt><dd>{% if lead.source == 'telegram_bot' %}Telegram-бот{% else %}Вручную{% endif %}</dd></div>
+          <div><dt>Создан</dt><dd>{{ lead.created_at }}</dd></div>
+        </dl>
+      </aside>
+    </div>
+  </section>
+{% endblock %}

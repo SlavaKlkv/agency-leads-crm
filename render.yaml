@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: agency-leads-crm
+    runtime: docker
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: agency-leads-db
+          property: connectionString
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        generateValue: true
+      - key: PUBLIC_BASE_URL
+        sync: false
+
+databases:
+  - name: agency-leads-db
+    databaseName: leadroom
+    user: leadroom
+    plan: free

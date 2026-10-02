@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Новый лид · {{ app_name }}{% endblock %}
+{% block content %}
+  <section class="form-page">
+    <a class="back-link" href="/">← Все лиды</a>
+    <p class="eyebrow">Ручное добавление</p>
+    <h1>Новый лид</h1>
+    <p class="subtitle">Заполните три поля — карточка сразу появится в CRM.</p>
+
+    <form class="form-card" action="/leads" method="post">
+      <label>
+        <span>Имя</span>
+        <input name="name" maxlength="120" required placeholder="Например, Мария">
+      </label>
+      <label>
+        <span>Контакт</span>
+        <input name="contact" maxlength="200" required placeholder="Телефон, email или @username">
+      </label>
+      <label>
+        <span>Запрос</span>
+        <textarea name="request_text" maxlength="4000" rows="5" required placeholder="Что нужно сделать?"></textarea>
+      </label>
+      <label>
+        <span>Теги <small>через запятую</small></span>
+        <input name="tags" maxlength="300" value="Новый" placeholder="Новый, Сайт">
+      </label>
+      <div class="form-actions">
+        <a class="button button-secondary" href="/">Отмена</a>
+        <button class="button button-primary" type="submit">Создать лида</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}
