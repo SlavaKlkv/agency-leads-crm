@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 from .config import Settings
 from .db import Database
-from .telegram import TelegramClient, TelegramFlow
+from .telegram import TelegramAPIError, TelegramClient, TelegramFlow
 
 
 APP_DIR = Path(__file__).parent
@@ -121,9 +121,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 status_code=503,
                 detail="Нужны PUBLIC_BASE_URL и TELEGRAM_WEBHOOK_SECRET",
             )
-        return await telegram_client.set_webhook(
-            app_settings.public_base_url, app_settings.telegram_webhook_secret
-        )
+        try:
+            return await telegram_client.set_webhook(
+                app_settings.public_base_url, app_settings.telegram_webhook_secret
+            )
+        except TelegramAPIError as error:
+            raise HTTPException(status_code=502, detail=str(error)) from None
 
     @app.get("/health")
     async def health():

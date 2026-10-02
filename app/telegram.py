@@ -8,6 +8,23 @@ import httpx
 from .db import Database, TelegramSession, TelegramUpdate
 
 
+class TelegramAPIError(RuntimeError):
+    """Безопасная ошибка Telegram API без токена бота в тексте."""
+
+
+def raise_for_telegram_error(response: httpx.Response) -> None:
+    if response.is_success:
+        return
+
+    try:
+        description = str(response.json().get("description") or "Unknown Telegram API error")
+    except (ValueError, AttributeError):
+        description = "Unknown Telegram API error"
+    raise TelegramAPIError(
+        f"Telegram API returned HTTP {response.status_code}: {description}"
+    ) from None
+
+
 @dataclass(frozen=True)
 class BotReply:
     chat_id: str
@@ -30,7 +47,7 @@ class TelegramClient:
                 f"https://api.telegram.org/bot{self.token}/sendMessage",
                 json=payload,
             )
-            response.raise_for_status()
+            raise_for_telegram_error(response)
 
     async def set_webhook(self, base_url: str, secret: str) -> dict:
         if not self.token:
@@ -46,7 +63,7 @@ class TelegramClient:
                 f"https://api.telegram.org/bot{self.token}/setWebhook",
                 json=payload,
             )
-            response.raise_for_status()
+            raise_for_telegram_error(response)
             return response.json()
 
 

@@ -1,9 +1,12 @@
 from pathlib import Path
 
+import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
+from app.telegram import TelegramAPIError, raise_for_telegram_error
 
 
 def make_client(tmp_path: Path) -> TestClient:
@@ -77,3 +80,21 @@ def test_telegram_webhook_rejects_wrong_secret(tmp_path: Path):
             headers={"X-Telegram-Bot-Api-Secret-Token": "wrong"},
         )
         assert response.status_code == 403
+
+
+def test_telegram_api_error_does_not_expose_bot_token():
+    token = "123456789:secret-token"
+    request = httpx.Request("POST", f"https://api.telegram.org/bot{token}/setWebhook")
+    response = httpx.Response(
+        400,
+        json={"ok": False, "description": "Bad Request: invalid webhook"},
+        request=request,
+    )
+
+    with pytest.raises(TelegramAPIError) as captured:
+        raise_for_telegram_error(response)
+
+    assert token not in str(captured.value)
+    assert str(captured.value) == (
+        "Telegram API returned HTTP 400: Bad Request: invalid webhook"
+    )
