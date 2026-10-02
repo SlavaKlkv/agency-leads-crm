@@ -2,6 +2,7 @@ services:
   - type: web
     name: agency-leads-crm
     runtime: docker
+    plan: free
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
