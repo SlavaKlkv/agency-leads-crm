@@ -16,16 +16,25 @@
   <nav class="filters" aria-label="Фильтр по тегу">
     <a class="filter {% if active_tag is none %}active{% endif %}" href="/">Все</a>
     {% for tag in tags %}
-      <div class="filter-item">
-        <a class="filter filter-{{ tag.tone }} {% if active_tag == tag.id %}active{% endif %}" href="/?tag={{ tag.id }}">
+      <div class="filter-chip filter-{{ tag.tone }} {% if active_tag == tag.id %}active{% endif %}">
+        <a class="filter-link" href="/?tag={{ tag.id }}">
           {{ tag.name }} <span>{{ tag.lead_count }}</span>
         </a>
-        <form action="/tags/{{ tag.id }}/delete" method="post" onsubmit="return confirm('Удалить этот тег у всех лидов?')">
+        <form action="/tags/{{ tag.id }}/delete" method="post" data-delete-tag data-tag-name="{{ tag.name }}">
           <button class="filter-delete" type="submit" title="Удалить тег" aria-label="Удалить тег {{ tag.name }}">×</button>
         </form>
       </div>
     {% endfor %}
   </nav>
+
+  <dialog class="confirm-dialog" id="delete-tag-dialog" aria-labelledby="delete-tag-title">
+    <h2 id="delete-tag-title">Удалить тег?</h2>
+    <p>Тег <strong id="delete-tag-name"></strong> будет снят со всех лидов. Это действие нельзя отменить.</p>
+    <div class="confirm-dialog-actions">
+      <button class="button button-secondary" type="button" id="delete-tag-cancel">Отмена</button>
+      <button class="button button-danger" type="button" id="delete-tag-confirm">Удалить</button>
+    </div>
+  </dialog>
 
   {% if leads %}
     <div class="lead-list">
@@ -57,4 +66,31 @@
       <a class="button button-primary" href="/leads/new">Добавить лид</a>
     </section>
   {% endif %}
+
+  <script>
+    const deleteTagDialog = document.querySelector("#delete-tag-dialog");
+    const deleteTagName = document.querySelector("#delete-tag-name");
+    let pendingDeleteForm = null;
+
+    document.querySelectorAll("[data-delete-tag]").forEach((form) => {
+      form.addEventListener("submit", (event) => {
+        if (form.dataset.confirmed === "true") return;
+        event.preventDefault();
+        pendingDeleteForm = form;
+        deleteTagName.textContent = `«${form.dataset.tagName}»`;
+        deleteTagDialog.showModal();
+      });
+    });
+
+    document.querySelector("#delete-tag-cancel").addEventListener("click", () => {
+      pendingDeleteForm = null;
+      deleteTagDialog.close();
+    });
+
+    document.querySelector("#delete-tag-confirm").addEventListener("click", () => {
+      if (!pendingDeleteForm) return;
+      pendingDeleteForm.dataset.confirmed = "true";
+      pendingDeleteForm.requestSubmit();
+    });
+  </script>
 {% endblock %}

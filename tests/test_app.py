@@ -49,6 +49,9 @@ def test_manual_lead_tags_and_filter(tmp_path: Path):
         filtered = client.get(f"/?tag={site_tag['id']}")
         assert "Анна" in filtered.text
         assert 'class="source source-manual"' in filtered.text
+        assert 'class="filter-chip filter-neutral active"' in filtered.text
+        assert 'id="delete-tag-dialog"' in filtered.text
+        assert "confirm(" not in filtered.text
 
         deleted = client.post(f"/tags/{site_tag['id']}/delete", follow_redirects=False)
         assert deleted.status_code == 303
