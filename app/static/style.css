@@ -64,9 +64,13 @@ h1 { font-size: clamp(38px, 6vw, 58px); line-height: 0.98; letter-spacing: -0.05
 .metric span { margin-top: 7px; font-size: 13px; }
 
 .filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 14px; margin-bottom: 8px; }
+.filter-item { display: inline-flex; flex: 0 0 auto; flex-direction: row; align-items: center; gap: 4px; }
+.filter-item form { display: flex; margin: 0; }
 .filter { white-space: nowrap; border: 1px solid var(--line); background: var(--surface); padding: 9px 13px; border-radius: 999px; color: var(--muted); font-size: 14px; font-weight: 650; }
 .filter span { margin-left: 5px; opacity: 0.65; }
 .filter.active { background: var(--ink); border-color: var(--ink); color: white; }
+.filter-delete { width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 17px; line-height: 1; }
+.filter-delete:hover { background: var(--danger); border-color: #efcfcc; color: var(--danger-ink); }
 .filter-warning:not(.active) { background: var(--warning); border-color: #efd991; color: var(--warning-ink); }
 .filter-success:not(.active) { background: var(--success); border-color: #c9e4d2; color: var(--success-ink); }
 .filter-danger:not(.active) { background: var(--danger); border-color: #efcfcc; color: var(--danger-ink); }

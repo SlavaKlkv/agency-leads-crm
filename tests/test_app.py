@@ -50,6 +50,21 @@ def test_manual_lead_tags_and_filter(tmp_path: Path):
         assert "Анна" in filtered.text
         assert 'class="source source-manual"' in filtered.text
 
+        deleted = client.post(f"/tags/{site_tag['id']}/delete", follow_redirects=False)
+        assert deleted.status_code == 303
+        assert deleted.headers["location"] == "/"
+        assert "Сайт" not in {tag["name"] for tag in client.app.state.database.list_tags()}
+        assert "Сайт" not in {
+            tag["name"] for tag in client.app.state.database.get_lead(1)["tags"]
+        }
+
+
+def test_delete_missing_tag_returns_not_found(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        response = client.post("/tags/999/delete")
+
+        assert response.status_code == 404
+
 
 def test_telegram_dialog_creates_one_tagged_lead(tmp_path: Path):
     headers = {"X-Telegram-Bot-Api-Secret-Token": "test-secret"}

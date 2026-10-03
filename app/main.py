@@ -98,6 +98,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         database.remove_tag(lead_id, tag_id)
         return RedirectResponse(f"/leads/{lead_id}", status_code=status.HTTP_303_SEE_OTHER)
 
+    @app.post("/tags/{tag_id}/delete")
+    async def delete_tag(tag_id: int):
+        if not database.delete_tag(tag_id):
+            raise HTTPException(status_code=404, detail="Тег не найден")
+        return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
+
     @app.post("/api/telegram/webhook")
     async def telegram_webhook(
         request: Request,

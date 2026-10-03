@@ -157,6 +157,15 @@ class Database:
             if lead:
                 lead.tags = [tag for tag in lead.tags if tag.id != tag_id]
 
+    def delete_tag(self, tag_id: int) -> bool:
+        with self.session() as session:
+            tag = session.scalar(select(Tag).options(selectinload(Tag.leads)).where(Tag.id == tag_id))
+            if tag is None:
+                return False
+            tag.leads.clear()
+            session.delete(tag)
+            return True
+
     def list_tags(self) -> list[dict]:
         with self.session() as session:
             rows = session.execute(

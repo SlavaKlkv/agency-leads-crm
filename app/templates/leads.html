@@ -16,9 +16,14 @@
   <nav class="filters" aria-label="Фильтр по тегу">
     <a class="filter {% if active_tag is none %}active{% endif %}" href="/">Все</a>
     {% for tag in tags %}
-      <a class="filter filter-{{ tag.tone }} {% if active_tag == tag.id %}active{% endif %}" href="/?tag={{ tag.id }}">
-        {{ tag.name }} <span>{{ tag.lead_count }}</span>
-      </a>
+      <div class="filter-item">
+        <a class="filter filter-{{ tag.tone }} {% if active_tag == tag.id %}active{% endif %}" href="/?tag={{ tag.id }}">
+          {{ tag.name }} <span>{{ tag.lead_count }}</span>
+        </a>
+        <form action="/tags/{{ tag.id }}/delete" method="post" onsubmit="return confirm('Удалить этот тег у всех лидов?')">
+          <button class="filter-delete" type="submit" title="Удалить тег" aria-label="Удалить тег {{ tag.name }}">×</button>
+        </form>
+      </div>
     {% endfor %}
   </nav>
 
