@@ -16,7 +16,7 @@
   <nav class="filters" aria-label="Фильтр по тегу">
     <a class="filter {% if active_tag is none %}active{% endif %}" href="/">Все</a>
     {% for tag in tags %}
-      <a class="filter {% if active_tag == tag.id %}active{% endif %}" href="/?tag={{ tag.id }}">
+      <a class="filter filter-{{ tag.tone }} {% if active_tag == tag.id %}active{% endif %}" href="/?tag={{ tag.id }}">
         {{ tag.name }} <span>{{ tag.lead_count }}</span>
       </a>
     {% endfor %}
@@ -38,7 +38,7 @@
               {% if lead.source == 'telegram_bot' %}Telegram{% else %}Вручную{% endif %}
             </span>
             <div class="tags">
-              {% for tag in lead.tags %}<span class="tag">{{ tag.name }}</span>{% endfor %}
+              {% for tag in lead.tags %}<span class="tag tag-{{ tag.tone }}">{{ tag.name }}</span>{% endfor %}
             </div>
           </div>
         </a>

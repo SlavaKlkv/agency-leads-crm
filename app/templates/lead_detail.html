@@ -22,7 +22,7 @@
         <div class="tags editable-tags">
           {% for tag in lead.tags %}
             <form action="/leads/{{ lead.id }}/tags/{{ tag.id }}/delete" method="post">
-              <button class="tag tag-remove" title="Удалить тег">{{ tag.name }} ×</button>
+              <button class="tag tag-{{ tag.tone }} tag-remove" title="Удалить тег">{{ tag.name }} ×</button>
             </form>
           {% else %}
             <p class="muted">Тегов пока нет.</p>
@@ -33,7 +33,12 @@
           <button class="button button-secondary" type="submit">Добавить</button>
         </form>
         <dl class="facts">
-          <div><dt>Источник</dt><dd>{% if lead.source == 'telegram_bot' %}Telegram-бот{% else %}Вручную{% endif %}</dd></div>
+          <div>
+            <dt>Источник</dt>
+            <dd class="source source-{{ lead.source }}">
+              {% if lead.source == 'telegram_bot' %}Telegram-бот{% else %}Вручную{% endif %}
+            </dd>
+          </div>
           <div><dt>Создан</dt><dd>{{ lead.created_at }}</dd></div>
         </dl>
       </aside>

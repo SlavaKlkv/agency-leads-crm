@@ -8,6 +8,22 @@ from sqlalchemy import Column, DateTime, ForeignKey, String, Table, Text, create
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, selectinload
 
 
+TAG_TONES = {
+    "telegram": "telegram",
+    "новый": "warning",
+    "обработан": "success",
+    "готово": "success",
+    "закрыт": "success",
+    "успешно": "success",
+    "просрочен": "danger",
+    "ошибка": "danger",
+}
+
+
+def tag_tone(name: str) -> str:
+    return TAG_TONES.get(name.strip().casefold(), "neutral")
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -149,7 +165,10 @@ class Database:
                 .group_by(Tag.id, Tag.name)
                 .order_by(func.lower(Tag.name))
             ).all()
-            return [dict(row._mapping) for row in rows]
+            return [
+                {**dict(row._mapping), "tone": tag_tone(row.name)}
+                for row in rows
+            ]
 
     def list_leads(self, tag_id: int | None = None) -> list[dict]:
         with self.session() as session:
@@ -175,7 +194,7 @@ class Database:
             "telegram_chat_id": lead.telegram_chat_id,
             "created_at": lead.created_at,
             "tags": [
-                {"id": tag.id, "name": tag.name}
+                {"id": tag.id, "name": tag.name, "tone": tag_tone(tag.name)}
                 for tag in sorted(lead.tags, key=lambda item: item.name.lower())
             ],
         }

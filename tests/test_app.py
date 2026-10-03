@@ -42,11 +42,13 @@ def test_manual_lead_tags_and_filter(tmp_path: Path):
         detail = client.get(response.headers["location"])
         assert "Анна" in detail.text
         assert "Сайт" in detail.text
+        assert 'class="tag tag-warning tag-remove"' in detail.text
 
         tags = client.app.state.database.list_tags()
         site_tag = next(tag for tag in tags if tag["name"] == "Сайт")
         filtered = client.get(f"/?tag={site_tag['id']}")
         assert "Анна" in filtered.text
+        assert 'class="source source-manual"' in filtered.text
 
 
 def test_telegram_dialog_creates_one_tagged_lead(tmp_path: Path):
@@ -66,6 +68,7 @@ def test_telegram_dialog_creates_one_tagged_lead(tmp_path: Path):
         assert leads[0]["name"] == "Иван"
         assert leads[0]["source"] == "telegram_bot"
         assert {tag["name"] for tag in leads[0]["tags"]} == {"Telegram", "Новый"}
+        assert {tag["tone"] for tag in leads[0]["tags"]} == {"telegram", "warning"}
 
         # Повторная доставка webhook не должна создавать дубль.
         assert client.post("/api/telegram/webhook", json=updates[-1], headers=headers).status_code == 200
