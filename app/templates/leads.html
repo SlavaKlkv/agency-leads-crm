@@ -9,42 +9,59 @@
     </div>
     <div class="metric">
       <span>выбрано</span>
-      <strong>{{ leads|length }}</strong>
+      <strong>{{ total_leads }}</strong>
     </div>
   </section>
 
   <div class="filter-bar">
   <nav class="filters" aria-label="Фильтр по статусу">
-    <a class="filter {% if active_status is none %}active{% endif %}" href="/{% if active_tags %}?{% for tag_id in active_tags %}tag={{ tag_id }}{% if not loop.last %}&amp;{% endif %}{% endfor %}{% endif %}">Все</a>
+    <a class="filter {% if active_status is none %}active{% endif %}" href="/{% if active_tags or active_per_page != 10 %}?{% for tag_id in active_tags %}tag={{ tag_id }}&amp;{% endfor %}{% if active_per_page != 10 %}per_page={{ active_per_page }}{% endif %}{% endif %}">Все</a>
     {% for status in statuses %}
-      <a class="filter status-filter status-filter-{{ status.tone }} {% if active_status == status.value %}active{% endif %}" href="/?status={{ status.value|urlencode }}{% for tag_id in active_tags %}&amp;tag={{ tag_id }}{% endfor %}">
+      <a class="filter status-filter status-filter-{{ status.tone }} {% if active_status == status.value %}active{% endif %}" href="/?status={{ status.value|urlencode }}{% for tag_id in active_tags %}&amp;tag={{ tag_id }}{% endfor %}{% if active_per_page != 10 %}&amp;per_page={{ active_per_page }}{% endif %}">
         {{ status.value }} <span>{{ status.lead_count }}</span>
       </a>
     {% endfor %}
   </nav>
 
-  <form class="tag-filter" action="/" method="get">
-    {% if active_status is not none %}<input type="hidden" name="status" value="{{ active_status }}">{% endif %}
+  <div class="tag-filter">
     <details class="tag-filter-menu">
       <summary>Теги{% if active_tags %} · {{ active_tags|length }}{% endif %}</summary>
       <div class="tag-filter-options">
         {% for tag in tags %}
-          <label>
-            <input type="checkbox" name="tag" value="{{ tag.id }}"{% if tag.id in active_tags %} checked{% endif %}>
-            <span>{{ tag.name }}</span>
-            <small>{{ tag.lead_count }}</small>
-          </label>
+          <div class="tag-filter-option">
+            <label for="tag-filter-{{ tag.id }}">
+              <input id="tag-filter-{{ tag.id }}" form="tag-filter-form" type="checkbox" name="tag" value="{{ tag.id }}"{% if tag.id in active_tags %} checked{% endif %}>
+              <span>{{ tag.name }}</span>
+              <small>{{ tag.lead_count }}</small>
+            </label>
+            <form action="/tags/{{ tag.id }}/delete" method="post" data-delete-tag data-tag-name="{{ tag.name }}">
+              <button class="tag-filter-delete" type="submit" title="Удалить тег" aria-label="Удалить тег {{ tag.name }}">×</button>
+            </form>
+          </div>
         {% else %}
           <p class="muted">Тегов пока нет.</p>
         {% endfor %}
         <div class="tag-filter-actions">
-          {% if active_tags %}<a href="/{% if active_status is not none %}?status={{ active_status|urlencode }}{% endif %}">Сбросить</a>{% endif %}
-          <button class="button button-primary" type="submit">Применить</button>
+          {% if active_tags %}<a href="/{% if active_status is not none %}?status={{ active_status|urlencode }}{% if active_per_page != 10 %}&amp;per_page={{ active_per_page }}{% endif %}{% elif active_per_page != 10 %}?per_page={{ active_per_page }}{% endif %}">Сбросить</a>{% endif %}
+          <form id="tag-filter-form" action="/" method="get">
+            {% if active_status is not none %}<input type="hidden" name="status" value="{{ active_status }}">{% endif %}
+            {% if active_per_page != 10 %}<input type="hidden" name="per_page" value="{{ active_per_page }}">{% endif %}
+            <button class="button button-primary" type="submit">Применить</button>
+          </form>
         </div>
       </div>
     </details>
-  </form>
   </div>
+  </div>
+
+  <dialog class="confirm-dialog" id="delete-tag-dialog" aria-labelledby="delete-tag-title">
+    <h2 id="delete-tag-title">Удалить тег?</h2>
+    <p>Тег <strong id="delete-tag-name"></strong> будет снят со всех лидов. Это действие нельзя отменить.</p>
+    <div class="confirm-dialog-actions">
+      <button class="button button-secondary" type="button" id="delete-tag-cancel">Отмена</button>
+      <button class="button button-danger" type="button" id="delete-tag-confirm">Удалить</button>
+    </div>
+  </dialog>
 
   <dialog class="confirm-dialog" id="delete-lead-dialog" aria-labelledby="delete-lead-title">
     <h2 id="delete-lead-title">Удалить лида?</h2>
@@ -93,6 +110,38 @@
         </div>
       {% endfor %}
     </div>
+    {% if total_pages > 1 %}
+      <nav class="pagination" aria-label="Пагинация лидов">
+        <p class="pagination-summary">Показано {{ page_start }}–{{ page_end }} из {{ total_leads }}</p>
+        <div class="pagination-controls">
+          {% if current_page > 1 %}
+            <a class="pagination-link" href="{{ page_url(current_page - 1) }}">← Назад</a>
+          {% endif %}
+          <div class="pagination-pages" aria-label="Выбор страницы">
+            {% for page_number in pagination_pages %}
+              {% if page_number is none %}
+                <span class="pagination-ellipsis" aria-hidden="true">…</span>
+              {% elif page_number == current_page %}
+                <span class="pagination-page active" aria-current="page">{{ page_number }}</span>
+              {% else %}
+                <a class="pagination-page" href="{{ page_url(page_number) }}" aria-label="Страница {{ page_number }}">{{ page_number }}</a>
+              {% endif %}
+            {% endfor %}
+          </div>
+          {% if current_page < total_pages %}
+            <a class="pagination-link" href="{{ page_url(current_page + 1) }}">Вперёд →</a>
+          {% endif %}
+        </div>
+        <form class="pagination-per-page" action="/" method="get">
+          {% for tag_id in active_tags %}<input type="hidden" name="tag" value="{{ tag_id }}">{% endfor %}
+          {% if active_status is not none %}<input type="hidden" name="status" value="{{ active_status }}">{% endif %}
+          <label for="per-page">Показывать</label>
+          <select id="per-page" name="per_page" onchange="this.form.requestSubmit()">
+            {% for option in per_page_options %}<option value="{{ option }}"{% if option == active_per_page %} selected{% endif %}>{{ option }}</option>{% endfor %}
+          </select>
+        </form>
+      </nav>
+    {% endif %}
   {% else %}
     <section class="empty-state">
       <div class="empty-icon">↗</div>
@@ -103,6 +152,31 @@
   {% endif %}
 
   <script>
+    const deleteTagDialog = document.querySelector("#delete-tag-dialog");
+    const deleteTagName = document.querySelector("#delete-tag-name");
+    let pendingDeleteTagForm = null;
+
+    document.querySelectorAll("[data-delete-tag]").forEach((form) => {
+      form.addEventListener("submit", (event) => {
+        if (form.dataset.confirmed === "true") return;
+        event.preventDefault();
+        pendingDeleteTagForm = form;
+        deleteTagName.textContent = `«${form.dataset.tagName}»`;
+        deleteTagDialog.showModal();
+      });
+    });
+
+    document.querySelector("#delete-tag-cancel").addEventListener("click", () => {
+      pendingDeleteTagForm = null;
+      deleteTagDialog.close();
+    });
+
+    document.querySelector("#delete-tag-confirm").addEventListener("click", () => {
+      if (!pendingDeleteTagForm) return;
+      pendingDeleteTagForm.dataset.confirmed = "true";
+      pendingDeleteTagForm.requestSubmit();
+    });
+
     const deleteLeadDialog = document.querySelector("#delete-lead-dialog");
     const deleteLeadName = document.querySelector("#delete-lead-name");
     let pendingDeleteLeadForm = null;

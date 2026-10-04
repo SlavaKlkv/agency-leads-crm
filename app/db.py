@@ -404,22 +404,45 @@ class Database:
         self,
         tag_ids: list[int] | None = None,
         status: str | None = None,
+        *,
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[dict]:
         with self.session() as session:
-            statement = select(Lead).options(selectinload(Lead.tags))
-            selected_tag_ids = list(dict.fromkeys(tag_ids or []))
-            if selected_tag_ids:
-                matching_leads = (
-                    select(lead_tags.c.lead_id)
-                    .where(lead_tags.c.tag_id.in_(selected_tag_ids))
-                    .group_by(lead_tags.c.lead_id)
-                    .having(func.count(func.distinct(lead_tags.c.tag_id)) == len(selected_tag_ids))
-                )
-                statement = statement.where(Lead.id.in_(matching_leads))
-            if status in _STATUS_TONES:
-                statement = statement.where(Lead.status == status)
+            statement = self._filtered_leads_statement(tag_ids, status).options(
+                selectinload(Lead.tags)
+            )
             statement = statement.order_by(Lead.created_at.desc(), Lead.id.desc())
+            if limit is not None:
+                statement = statement.limit(limit).offset(offset)
             return [self._lead_dict(lead) for lead in session.scalars(statement).all()]
+
+    def count_leads(
+        self, tag_ids: list[int] | None = None, status: str | None = None
+    ) -> int:
+        with self.session() as session:
+            statement = self._filtered_leads_statement(tag_ids, status).with_only_columns(
+                func.count(Lead.id)
+            ).order_by(None)
+            return session.scalar(statement) or 0
+
+    @staticmethod
+    def _filtered_leads_statement(
+        tag_ids: list[int] | None, status: str | None
+    ):
+        statement = select(Lead)
+        selected_tag_ids = list(dict.fromkeys(tag_ids or []))
+        if selected_tag_ids:
+            matching_leads = (
+                select(lead_tags.c.lead_id)
+                .where(lead_tags.c.tag_id.in_(selected_tag_ids))
+                .group_by(lead_tags.c.lead_id)
+                .having(func.count(func.distinct(lead_tags.c.tag_id)) == len(selected_tag_ids))
+            )
+            statement = statement.where(Lead.id.in_(matching_leads))
+        if status in _STATUS_TONES:
+            statement = statement.where(Lead.status == status)
+        return statement
 
     def get_lead(self, lead_id: int) -> dict | None:
         with self.session() as session:

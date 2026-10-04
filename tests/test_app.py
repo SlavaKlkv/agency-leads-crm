@@ -72,6 +72,9 @@ def test_manual_lead_tags_and_filter(tmp_path: Path):
         assert f'name="tag" value="{site_tag["id"]}" checked' in filtered.text
         assert "Теги · 1" in filtered.text
         assert "Статус" not in filtered.text
+        assert f'action="/tags/{site_tag["id"]}/delete"' in filtered.text
+        assert 'id="delete-tag-dialog"' in filtered.text
+        assert "confirm(" not in filtered.text
 
         second_lead = client.post(
             "/leads",
@@ -139,6 +142,84 @@ def test_list_shows_quick_edit_and_delete_actions(tmp_path: Path):
         assert "data-delete-lead" in page.text
         assert 'id="delete-lead-dialog"' in page.text
         assert 'class="status status-warning">Новый' in page.text
+
+
+def test_leads_pagination_preserves_filters(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        for number in range(12):
+            client.app.state.database.create_lead(
+                name=f"Лид №{number:02d}",
+                contact=f"lead{number}@example.com",
+                request_text="Нужна реклама",
+                source="manual",
+                tags=["Реклама"],
+                status="В работе",
+            )
+
+        tag_id = client.app.state.database.list_tags()[0]["id"]
+        first_page = client.get(f"/?tag={tag_id}&status=В работе")
+        assert first_page.status_code == 200
+        assert "Лид №11" in first_page.text
+        assert "Лид №01" not in first_page.text
+        assert "Лид №00" not in first_page.text
+        assert "12" in first_page.text
+        assert "Показано 1–10 из 12" in first_page.text
+        assert 'class="pagination-page active" aria-current="page">1' in first_page.text
+        assert f'href="/?tag={tag_id}&amp;status=%D0%92+%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%B5&amp;page=2" aria-label="Страница 2"' in first_page.text
+        assert f'href="/?tag={tag_id}&amp;status=%D0%92+%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%B5&amp;page=2"' in first_page.text
+
+        second_page = client.get(f"/?tag={tag_id}&status=В работе&page=2")
+        assert "Лид №01" in second_page.text
+        assert "Лид №00" in second_page.text
+        assert "Лид №11" not in second_page.text
+        assert "Показано 11–12 из 12" in second_page.text
+        assert 'class="pagination-page active" aria-current="page">2' in second_page.text
+        assert f'href="/?tag={tag_id}&amp;status=%D0%92+%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%B5&amp;page=1"' in second_page.text
+
+
+def test_leads_pagination_shows_direct_links_for_long_lists(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        for number in range(80):
+            client.app.state.database.create_lead(
+                name=f"Лид №{number:03d}",
+                contact=f"lead{number}@example.com",
+                request_text="Нужна реклама",
+                source="manual",
+            )
+
+        page = client.get("/?page=5")
+        assert page.status_code == 200
+        assert "Показано 41–50 из 80" in page.text
+        assert 'class="pagination-page active" aria-current="page">5' in page.text
+        assert 'href="/?page=1" aria-label="Страница 1"' in page.text
+        assert 'href="/?page=4" aria-label="Страница 4"' in page.text
+        assert 'href="/?page=6" aria-label="Страница 6"' in page.text
+        assert 'href="/?page=8" aria-label="Страница 8"' in page.text
+        assert page.text.count('class="pagination-ellipsis"') == 2
+
+        first_page = client.get("/")
+        assert 'href="/?page=2" aria-label="Страница 2"' in first_page.text
+        assert 'href="/?page=3" aria-label="Страница 3"' in first_page.text
+        assert 'href="/?page=4" aria-label="Страница 4"' in first_page.text
+
+
+def test_leads_pagination_can_show_five_per_page(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        for number in range(12):
+            client.app.state.database.create_lead(
+                name=f"Лид №{number:02d}",
+                contact=f"lead{number}@example.com",
+                request_text="Нужна реклама",
+                source="manual",
+            )
+
+        page = client.get("/?per_page=5")
+        assert "Показано 1–5 из 12" in page.text
+        assert "Лид №11" in page.text
+        assert "Лид №07" in page.text
+        assert "Лид №06" not in page.text
+        assert '<option value="5" selected>5</option>' in page.text
+        assert 'href="/?per_page=5&amp;page=2"' in page.text
 
 
 def test_edit_lead_updates_fields_and_tags(tmp_path: Path):

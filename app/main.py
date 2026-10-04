@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 import secrets
+from urllib.parse import urlencode
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -17,6 +18,8 @@ from .telegram_user import TelegramUserError, TelegramUserService
 
 
 APP_DIR = Path(__file__).parent
+DEFAULT_LEADS_PER_PAGE = 10
+LEADS_PER_PAGE_OPTIONS = (5, 10)
 telegram_admin_security = HTTPBasic(auto_error=False)
 
 
@@ -79,6 +82,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request: Request,
         tag: list[int] = Query(default=[]),
         lead_status: str | None = Query(default=None, alias="status"),
+        page: int = Query(default=1, ge=1),
+        per_page: int = Query(default=DEFAULT_LEADS_PER_PAGE),
     ):
         active_tags = list(dict.fromkeys(tag))
         active_status = (
@@ -86,11 +91,59 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if any(item["value"] == lead_status for item in LEAD_STATUSES)
             else None
         )
+        active_per_page = (
+            per_page if per_page in LEADS_PER_PAGE_OPTIONS else DEFAULT_LEADS_PER_PAGE
+        )
+        total_leads = database.count_leads(active_tags, active_status)
+        total_pages = max(1, (total_leads + active_per_page - 1) // active_per_page)
+        current_page = min(page, total_pages)
+
+        pagination_pages: list[int | None] = [1]
+        middle_first = 2
+        middle_last = total_pages - 1
+        window_size = 3
+        if middle_first <= middle_last:
+            window_start = min(
+                max(current_page - 1, middle_first),
+                max(middle_first, middle_last - window_size + 1),
+            )
+            window_end = min(window_start + window_size - 1, middle_last)
+            if window_start > middle_first:
+                pagination_pages.append(None)
+            pagination_pages.extend(range(window_start, window_end + 1))
+            if window_end < middle_last:
+                pagination_pages.append(None)
+        if total_pages > 1:
+            pagination_pages.append(total_pages)
+
+        def page_url(target_page: int) -> str:
+            query: list[tuple[str, str | int]] = [("tag", tag_id) for tag_id in active_tags]
+            if active_status is not None:
+                query.append(("status", active_status))
+            if active_per_page != DEFAULT_LEADS_PER_PAGE:
+                query.append(("per_page", active_per_page))
+            query.append(("page", target_page))
+            return f"/?{urlencode(query)}"
+
         return templates.TemplateResponse(
             request,
             "leads.html",
             {
-                "leads": database.list_leads(active_tags, active_status),
+                "leads": database.list_leads(
+                    active_tags,
+                    active_status,
+                    limit=active_per_page,
+                    offset=(current_page - 1) * active_per_page,
+                ),
+                "total_leads": total_leads,
+                "current_page": current_page,
+                "total_pages": total_pages,
+                "pagination_pages": pagination_pages,
+                "page_start": (current_page - 1) * active_per_page + 1 if total_leads else 0,
+                "page_end": min(current_page * active_per_page, total_leads),
+                "page_url": page_url,
+                "active_per_page": active_per_page,
+                "per_page_options": LEADS_PER_PAGE_OPTIONS,
                 "tags": database.list_tags(),
                 "statuses": database.list_statuses(),
                 "active_tags": active_tags,
