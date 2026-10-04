@@ -5,92 +5,127 @@
     <div>
       <p class="eyebrow">Мини-CRM агентства</p>
       <h1>Лиды</h1>
-      <p class="subtitle">Заявки из Telegram и обращения, добавленные вручную.</p>
+      <p class="subtitle">Заявки из Telegram и обращения, добавленные вручную</p>
     </div>
     <div class="metric">
+      <span>выбрано</span>
       <strong>{{ leads|length }}</strong>
-      <span>в текущем списке</span>
     </div>
   </section>
 
-  <nav class="filters" aria-label="Фильтр по тегу">
-    <a class="filter {% if active_tag is none %}active{% endif %}" href="/">Все</a>
-    {% for tag in tags %}
-      <div class="filter-chip filter-{{ tag.tone }} {% if active_tag == tag.id %}active{% endif %}">
-        <a class="filter-link" href="/?tag={{ tag.id }}">
-          {{ tag.name }} <span>{{ tag.lead_count }}</span>
-        </a>
-        <form action="/tags/{{ tag.id }}/delete" method="post" data-delete-tag data-tag-name="{{ tag.name }}">
-          <button class="filter-delete" type="submit" title="Удалить тег" aria-label="Удалить тег {{ tag.name }}">×</button>
-        </form>
-      </div>
+  <div class="filter-bar">
+  <nav class="filters" aria-label="Фильтр по статусу">
+    <a class="filter {% if active_status is none %}active{% endif %}" href="/{% if active_tags %}?{% for tag_id in active_tags %}tag={{ tag_id }}{% if not loop.last %}&amp;{% endif %}{% endfor %}{% endif %}">Все</a>
+    {% for status in statuses %}
+      <a class="filter status-filter status-filter-{{ status.tone }} {% if active_status == status.value %}active{% endif %}" href="/?status={{ status.value|urlencode }}{% for tag_id in active_tags %}&amp;tag={{ tag_id }}{% endfor %}">
+        {{ status.value }} <span>{{ status.lead_count }}</span>
+      </a>
     {% endfor %}
   </nav>
 
-  <dialog class="confirm-dialog" id="delete-tag-dialog" aria-labelledby="delete-tag-title">
-    <h2 id="delete-tag-title">Удалить тег?</h2>
-    <p>Тег <strong id="delete-tag-name"></strong> будет снят со всех лидов. Это действие нельзя отменить.</p>
+  <form class="tag-filter" action="/" method="get">
+    {% if active_status is not none %}<input type="hidden" name="status" value="{{ active_status }}">{% endif %}
+    <details class="tag-filter-menu">
+      <summary>Теги{% if active_tags %} · {{ active_tags|length }}{% endif %}</summary>
+      <div class="tag-filter-options">
+        {% for tag in tags %}
+          <label>
+            <input type="checkbox" name="tag" value="{{ tag.id }}"{% if tag.id in active_tags %} checked{% endif %}>
+            <span>{{ tag.name }}</span>
+            <small>{{ tag.lead_count }}</small>
+          </label>
+        {% else %}
+          <p class="muted">Тегов пока нет.</p>
+        {% endfor %}
+        <div class="tag-filter-actions">
+          {% if active_tags %}<a href="/{% if active_status is not none %}?status={{ active_status|urlencode }}{% endif %}">Сбросить</a>{% endif %}
+          <button class="button button-primary" type="submit">Применить</button>
+        </div>
+      </div>
+    </details>
+  </form>
+  </div>
+
+  <dialog class="confirm-dialog" id="delete-lead-dialog" aria-labelledby="delete-lead-title">
+    <h2 id="delete-lead-title">Удалить лида?</h2>
+    <p>Лид <strong id="delete-lead-name"></strong> будет удалён из CRM. Это действие нельзя отменить.</p>
     <div class="confirm-dialog-actions">
-      <button class="button button-secondary" type="button" id="delete-tag-cancel">Отмена</button>
-      <button class="button button-danger" type="button" id="delete-tag-confirm">Удалить</button>
+      <button class="button button-secondary" type="button" id="delete-lead-cancel">Отмена</button>
+      <button class="button button-danger" type="button" id="delete-lead-confirm">Удалить</button>
     </div>
   </dialog>
 
   {% if leads %}
     <div class="lead-list">
       {% for lead in leads %}
-        <a class="lead-card" href="/leads/{{ lead.id }}">
-          <div class="lead-primary">
-            <div class="avatar">{{ lead.name[0]|upper }}</div>
-            <div>
-              <h2>{{ lead.name }}</h2>
-              <p>{{ lead.request_text }}</p>
+        <div class="lead-card">
+          <a class="lead-card-body" href="/leads/{{ lead.id }}">
+            <div class="lead-primary">
+              {% if lead.has_avatar %}
+                <img class="avatar avatar-image" src="/leads/{{ lead.id }}/avatar" alt="">
+              {% else %}
+                <div class="avatar">{{ lead.name[0]|upper }}</div>
+              {% endif %}
+              <div>
+                <h2>{{ lead.name }}</h2>
+                <p>{{ lead.request_text }}</p>
+              </div>
+            </div>
+          </a>
+          <div class="lead-actions">
+            <span class="lead-hint" aria-hidden="true">›</span>
+            <div class="lead-actions-buttons">
+              <a class="icon-button" href="/leads/{{ lead.id }}/edit" title="Редактировать лида" aria-label="Редактировать лида {{ lead.name }}">✎</a>
+              <form action="/leads/{{ lead.id }}/delete" method="post" data-delete-lead data-lead-name="{{ lead.name }}">
+                <button class="icon-button icon-button-danger" type="submit" title="Удалить лида" aria-label="Удалить лида {{ lead.name }}">✕</button>
+              </form>
             </div>
           </div>
           <div class="lead-meta">
+            <span class="status status-{{ lead.status_tone }}">{{ lead.status }}</span>
             <span class="source source-{{ lead.source }}">
-              {% if lead.source == 'telegram_bot' %}Telegram{% else %}Вручную{% endif %}
+              {% if lead.source == 'telegram_bot' %}Telegram-бот{% elif lead.source == 'telegram_user' %}Telegram{% else %}Вручную{% endif %}
             </span>
             <div class="tags">
               {% for tag in lead.tags %}<span class="tag tag-{{ tag.tone }}">{{ tag.name }}</span>{% endfor %}
             </div>
           </div>
-        </a>
+        </div>
       {% endfor %}
     </div>
   {% else %}
     <section class="empty-state">
       <div class="empty-icon">↗</div>
       <h2>Здесь появятся заявки</h2>
-      <p>Добавьте первый лид вручную или напишите подключённому Telegram-боту.</p>
-      <a class="button button-primary" href="/leads/new">Добавить лид</a>
+      <p>Добавьте первого лида вручную или напишите подключённому Telegram-боту.</p>
+      <a class="button button-primary" href="/leads/new">Добавить лида</a>
     </section>
   {% endif %}
 
   <script>
-    const deleteTagDialog = document.querySelector("#delete-tag-dialog");
-    const deleteTagName = document.querySelector("#delete-tag-name");
-    let pendingDeleteForm = null;
+    const deleteLeadDialog = document.querySelector("#delete-lead-dialog");
+    const deleteLeadName = document.querySelector("#delete-lead-name");
+    let pendingDeleteLeadForm = null;
 
-    document.querySelectorAll("[data-delete-tag]").forEach((form) => {
+    document.querySelectorAll("[data-delete-lead]").forEach((form) => {
       form.addEventListener("submit", (event) => {
         if (form.dataset.confirmed === "true") return;
         event.preventDefault();
-        pendingDeleteForm = form;
-        deleteTagName.textContent = `«${form.dataset.tagName}»`;
-        deleteTagDialog.showModal();
+        pendingDeleteLeadForm = form;
+        deleteLeadName.textContent = `«${form.dataset.leadName}»`;
+        deleteLeadDialog.showModal();
       });
     });
 
-    document.querySelector("#delete-tag-cancel").addEventListener("click", () => {
-      pendingDeleteForm = null;
-      deleteTagDialog.close();
+    document.querySelector("#delete-lead-cancel").addEventListener("click", () => {
+      pendingDeleteLeadForm = null;
+      deleteLeadDialog.close();
     });
 
-    document.querySelector("#delete-tag-confirm").addEventListener("click", () => {
-      if (!pendingDeleteForm) return;
-      pendingDeleteForm.dataset.confirmed = "true";
-      pendingDeleteForm.requestSubmit();
+    document.querySelector("#delete-lead-confirm").addEventListener("click", () => {
+      if (!pendingDeleteLeadForm) return;
+      pendingDeleteLeadForm.dataset.confirmed = "true";
+      pendingDeleteLeadForm.requestSubmit();
     });
   </script>
 {% endblock %}

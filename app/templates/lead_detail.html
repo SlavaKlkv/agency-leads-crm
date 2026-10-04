@@ -4,11 +4,19 @@
   <section class="detail-page">
     <a class="back-link" href="/">← Все лиды</a>
     <div class="detail-header">
-      <div class="avatar avatar-large">{{ lead.name[0]|upper }}</div>
-      <div>
+      {% if lead.has_avatar %}
+        <img class="avatar avatar-image avatar-large" src="/leads/{{ lead.id }}/avatar" alt="">
+      {% else %}
+        <div class="avatar avatar-large">{{ lead.name[0]|upper }}</div>
+      {% endif %}
+      <div class="detail-heading">
         <p class="eyebrow">Лид #{{ lead.id }}</p>
         <h1>{{ lead.name }}</h1>
         <p class="subtitle">{{ lead.contact }}</p>
+      </div>
+      <div class="detail-actions">
+        <a class="button button-secondary" href="/leads/{{ lead.id }}/edit">Редактировать</a>
+        <button class="button button-danger" type="button" id="delete-lead-open">Удалить</button>
       </div>
     </div>
 
@@ -34,14 +42,39 @@
         </form>
         <dl class="facts">
           <div>
+            <dt>Статус</dt>
+            <dd><span class="status status-{{ lead.status_tone }}">{{ lead.status }}</span></dd>
+          </div>
+          <div>
             <dt>Источник</dt>
             <dd class="source source-{{ lead.source }}">
-              {% if lead.source == 'telegram_bot' %}Telegram-бот{% else %}Вручную{% endif %}
+              {% if lead.source == 'telegram_bot' %}Telegram-бот{% elif lead.source == 'telegram_user' %}Telegram-аккаунт{% else %}Вручную{% endif %}
             </dd>
           </div>
           <div><dt>Создан</dt><dd>{{ lead.created_at }}</dd></div>
         </dl>
       </aside>
     </div>
+
+    <dialog class="confirm-dialog" id="delete-lead-dialog" aria-labelledby="delete-lead-title">
+      <h2 id="delete-lead-title">Удалить лида?</h2>
+      <p>Лид <strong>{{ lead.name }}</strong> будет удалён из CRM. Это действие нельзя отменить.</p>
+      <div class="confirm-dialog-actions">
+        <button class="button button-secondary" type="button" id="delete-lead-cancel">Отмена</button>
+        <form action="/leads/{{ lead.id }}/delete" method="post">
+          <button class="button button-danger" type="submit">Удалить</button>
+        </form>
+      </div>
+    </dialog>
   </section>
+
+  <script>
+    const deleteLeadDialog = document.querySelector("#delete-lead-dialog");
+    document.querySelector("#delete-lead-open").addEventListener("click", () => {
+      deleteLeadDialog.showModal();
+    });
+    document.querySelector("#delete-lead-cancel").addEventListener("click", () => {
+      deleteLeadDialog.close();
+    });
+  </script>
 {% endblock %}

@@ -5,7 +5,7 @@
     <a class="back-link" href="/">← Все лиды</a>
     <p class="eyebrow">Ручное добавление</p>
     <h1>Новый лид</h1>
-    <p class="subtitle">Заполните три поля — карточка сразу появится в CRM.</p>
+    <p class="subtitle">Заполните поля — карточка сразу появится в CRM.</p>
 
     <form class="form-card" action="/leads" method="post">
       <label>
@@ -21,12 +21,21 @@
         <textarea name="request_text" maxlength="4000" rows="5" required placeholder="Что нужно сделать?"></textarea>
       </label>
       <label>
-        <span>Теги <small>через запятую</small></span>
-        <input name="tags" maxlength="300" value="Новый" placeholder="Новый, Сайт">
+        <span>Статус</span>
+        <select name="status">
+          {% for status in statuses %}
+            <option value="{{ status.value }}"{% if status.value == default_status %} selected{% endif %}>{{ status.value }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Теги</span>
+        <small>через запятую, например: Сайт, Реклама</small>
+        <input name="tags" maxlength="300" value="" placeholder="Сайт, Реклама">
       </label>
       <div class="form-actions">
         <a class="button button-secondary" href="/">Отмена</a>
-        <button class="button button-primary" type="submit">Создать лид</button>
+        <button class="button button-primary" type="submit">Создать лида</button>
       </div>
     </form>
   </section>

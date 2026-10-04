@@ -133,7 +133,6 @@ class TelegramFlow:
                         contact=conversation.contact or "Не указан",
                         request_text=text[:4000],
                         source="telegram_bot",
-                        tags=["Telegram", "Новый"],
                         telegram_chat_id=chat_id,
                         session=session,
                     )

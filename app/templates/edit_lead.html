@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Редактирование · {{ lead.name }} · {{ app_name }}{% endblock %}
+{% block content %}
+  <section class="form-page">
+    <a class="back-link" href="/leads/{{ lead.id }}">← К лиду</a>
+    <p class="eyebrow">Лид #{{ lead.id }}</p>
+    <h1>Редактирование</h1>
+    <p class="subtitle">Измените данные заявки и сохраните изменения.</p>
+
+    <form class="form-card" action="/leads/{{ lead.id }}" method="post">
+      <label>
+        <span>Имя</span>
+        <input name="name" maxlength="120" required value="{{ lead.name }}">
+      </label>
+      <label>
+        <span>Контакт</span>
+        <input name="contact" maxlength="200" required value="{{ lead.contact }}">
+      </label>
+      <label>
+        <span>Запрос</span>
+        <textarea name="request_text" maxlength="4000" rows="5" required>{{ lead.request_text }}</textarea>
+      </label>
+      <label>
+        <span>Статус</span>
+        <select name="status">
+          {% for status in statuses %}
+            <option value="{{ status.value }}"{% if status.value == lead.status %} selected{% endif %}>{{ status.value }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Теги</span>
+        <small>через запятую, например: Сайт, Реклама</small>
+        <input name="tags" maxlength="300" value="{{ tags_text }}" placeholder="Сайт, Реклама">
+      </label>
+      <div class="form-actions">
+        <a class="button button-secondary" href="/leads/{{ lead.id }}">Отмена</a>
+        <button class="button button-primary" type="submit">Сохранить</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

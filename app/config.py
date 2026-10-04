@@ -3,6 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
 
 def normalize_database_url(url: str) -> str:
     if url.startswith("postgres://"):
@@ -19,9 +24,12 @@ class Settings:
     telegram_bot_token: str = ""
     telegram_webhook_secret: str = ""
     public_base_url: str = ""
+    telegram_api_id: int | None = None
+    telegram_api_hash: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
+        telegram_api_id = os.getenv("TELEGRAM_API_ID", "").strip()
         return cls(
             app_name=os.getenv("APP_NAME", "Leadroom"),
             database_url=normalize_database_url(
@@ -33,4 +41,6 @@ class Settings:
             telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
             telegram_webhook_secret=os.getenv("TELEGRAM_WEBHOOK_SECRET", ""),
             public_base_url=os.getenv("PUBLIC_BASE_URL", "").rstrip("/"),
+            telegram_api_id=int(telegram_api_id) if telegram_api_id else None,
+            telegram_api_hash=os.getenv("TELEGRAM_API_HASH", ""),
         )

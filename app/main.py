@@ -4,14 +4,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 import secrets
 
-from fastapi import FastAPI, Form, Header, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Form, Header, HTTPException, Query, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .config import Settings
-from .db import Database
+from .db import DEFAULT_STATUS, LEAD_STATUSES, Database
 from .telegram import TelegramAPIError, TelegramClient, TelegramFlow
+from .telegram_user import TelegramUserError, TelegramUserService
 
 
 APP_DIR = Path(__file__).parent
@@ -22,30 +23,52 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     database = Database(app_settings.database_url)
     telegram_client = TelegramClient(app_settings.telegram_bot_token)
     telegram_flow = TelegramFlow(database)
+    telegram_user = TelegramUserService(
+        database,
+        api_id=app_settings.telegram_api_id,
+        api_hash=app_settings.telegram_api_hash,
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         database.initialize()
-        yield
+        await telegram_user.start()
+        try:
+            yield
+        finally:
+            await telegram_user.stop()
 
     app = FastAPI(title=app_settings.app_name, lifespan=lifespan)
     app.state.settings = app_settings
     app.state.database = database
     app.state.telegram_client = telegram_client
     app.state.telegram_flow = telegram_flow
+    app.state.telegram_user = telegram_user
 
     app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
     templates = Jinja2Templates(directory=APP_DIR / "templates")
 
     @app.get("/", response_class=HTMLResponse)
-    async def leads(request: Request, tag: int | None = None):
+    async def leads(
+        request: Request,
+        tag: list[int] = Query(default=[]),
+        lead_status: str | None = Query(default=None, alias="status"),
+    ):
+        active_tags = list(dict.fromkeys(tag))
+        active_status = (
+            lead_status
+            if any(item["value"] == lead_status for item in LEAD_STATUSES)
+            else None
+        )
         return templates.TemplateResponse(
             request,
             "leads.html",
             {
-                "leads": database.list_leads(tag),
+                "leads": database.list_leads(active_tags, active_status),
                 "tags": database.list_tags(),
-                "active_tag": tag,
+                "statuses": database.list_statuses(),
+                "active_tags": active_tags,
+                "active_status": active_status,
                 "app_name": app_settings.app_name,
             },
         )
@@ -55,7 +78,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return templates.TemplateResponse(
             request,
             "new_lead.html",
-            {"app_name": app_settings.app_name},
+            {
+                "app_name": app_settings.app_name,
+                "statuses": LEAD_STATUSES,
+                "default_status": DEFAULT_STATUS,
+            },
         )
 
     @app.post("/leads")
@@ -63,7 +90,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         name: str = Form(min_length=1, max_length=120),
         contact: str = Form(min_length=1, max_length=200),
         request_text: str = Form(min_length=1, max_length=4000),
-        tags: str = Form(default="Новый"),
+        tags: str = Form(default=""),
+        lead_status: str = Form(default=DEFAULT_STATUS, alias="status"),
     ):
         tag_names = [item.strip() for item in tags.split(",") if item.strip()]
         lead_id = database.create_lead(
@@ -72,6 +100,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             request_text=request_text,
             source="manual",
             tags=tag_names,
+            status=lead_status,
         )
         return RedirectResponse(f"/leads/{lead_id}", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -85,6 +114,63 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "lead_detail.html",
             {"lead": lead, "app_name": app_settings.app_name},
         )
+
+    @app.get("/leads/{lead_id}/avatar")
+    async def lead_avatar(lead_id: int):
+        avatar = database.get_lead_avatar(lead_id)
+        if avatar is None:
+            raise HTTPException(status_code=404, detail="Аватар не найден")
+        return Response(
+            content=avatar,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "private, no-cache"},
+        )
+
+    @app.get("/leads/{lead_id}/edit", response_class=HTMLResponse)
+    async def edit_lead(request: Request, lead_id: int):
+        lead = database.get_lead(lead_id)
+        if not lead:
+            raise HTTPException(status_code=404, detail="Лид не найден")
+        tags_text = ", ".join(tag["name"] for tag in lead["tags"])
+        return templates.TemplateResponse(
+            request,
+            "edit_lead.html",
+            {
+                "lead": lead,
+                "tags_text": tags_text,
+                "app_name": app_settings.app_name,
+                "statuses": LEAD_STATUSES,
+                "default_status": DEFAULT_STATUS,
+            },
+        )
+
+    @app.post("/leads/{lead_id}")
+    async def update_lead(
+        lead_id: int,
+        name: str = Form(min_length=1, max_length=120),
+        contact: str = Form(min_length=1, max_length=200),
+        request_text: str = Form(min_length=1, max_length=4000),
+        tags: str = Form(default=""),
+        lead_status: str = Form(default=DEFAULT_STATUS, alias="status"),
+    ):
+        tag_names = [item.strip() for item in tags.split(",") if item.strip()]
+        updated = database.update_lead(
+            lead_id,
+            name=name,
+            contact=contact,
+            request_text=request_text,
+            tags=tag_names,
+            status=lead_status,
+        )
+        if not updated:
+            raise HTTPException(status_code=404, detail="Лид не найден")
+        return RedirectResponse(f"/leads/{lead_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+    @app.post("/leads/{lead_id}/delete")
+    async def delete_lead(lead_id: int):
+        if not database.delete_lead(lead_id):
+            raise HTTPException(status_code=404, detail="Лид не найден")
+        return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
 
     @app.post("/leads/{lead_id}/tags")
     async def add_tag(lead_id: int, tag: str = Form(min_length=1, max_length=80)):
@@ -134,12 +220,70 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except TelegramAPIError as error:
             raise HTTPException(status_code=502, detail=str(error)) from None
 
+    def telegram_account_context(request: Request, error: str = "", message: str = ""):
+        return {
+            "request": request,
+            "app_name": app_settings.app_name,
+            "telegram": telegram_user.status(),
+            "error": error,
+            "message": message,
+        }
+
+    @app.get("/telegram", response_class=HTMLResponse)
+    async def telegram_account(request: Request):
+        return templates.TemplateResponse(
+            request,
+            "telegram.html",
+            telegram_account_context(request),
+        )
+
+    @app.post("/telegram/send-code", response_class=HTMLResponse)
+    async def telegram_send_code(request: Request, phone: str = Form()):
+        try:
+            await telegram_user.send_code(phone)
+            message = "Код отправлен в Telegram."
+            error = ""
+        except TelegramUserError as exc:
+            message = ""
+            error = str(exc)
+        return templates.TemplateResponse(
+            request,
+            "telegram.html",
+            telegram_account_context(request, error=error, message=message),
+        )
+
+    @app.post("/telegram/verify", response_class=HTMLResponse)
+    async def telegram_verify(
+        request: Request,
+        code: str = Form(default=""),
+        password: str = Form(default=""),
+    ):
+        try:
+            await telegram_user.verify(code, password)
+            message = "Telegram-аккаунт подключён."
+            error = ""
+        except TelegramUserError as exc:
+            message = ""
+            error = str(exc)
+        return templates.TemplateResponse(
+            request,
+            "telegram.html",
+            telegram_account_context(request, error=error, message=message),
+        )
+
+    @app.post("/telegram/disconnect")
+    async def telegram_disconnect():
+        await telegram_user.disconnect_account()
+        return RedirectResponse("/telegram", status_code=status.HTTP_303_SEE_OTHER)
+
     @app.get("/health")
     async def health():
         return {
             "status": "ok",
             "bot_configured": bool(app_settings.telegram_bot_token),
             "public_url_configured": bool(app_settings.public_base_url),
+            "telegram_user_configured": telegram_user.configured,
+            "telegram_user_connected": telegram_user.connected,
         }
 
     return app
