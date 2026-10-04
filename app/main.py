@@ -4,8 +4,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 import secrets
 
-from fastapi import FastAPI, Form, Header, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, Form, Header, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -16,6 +17,7 @@ from .telegram_user import TelegramUserError, TelegramUserService
 
 
 APP_DIR = Path(__file__).parent
+telegram_admin_security = HTTPBasic(auto_error=False)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -28,6 +30,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         api_id=app_settings.telegram_api_id,
         api_hash=app_settings.telegram_api_hash,
     )
+
+    def require_telegram_admin(
+        credentials: HTTPBasicCredentials | None = Depends(telegram_admin_security),
+    ) -> None:
+        expected_password = app_settings.telegram_admin_password
+        if not expected_password:
+            if app_settings.public_base_url:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Для подключения Telegram задайте TELEGRAM_ADMIN_PASSWORD.",
+                )
+            return
+        if (
+            credentials is None
+            or not secrets.compare_digest(credentials.username, "admin")
+            or not secrets.compare_digest(
+                credentials.password.encode(), expected_password.encode()
+            )
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Нужна авторизация администратора.",
+                headers={"WWW-Authenticate": "Basic"},
+            )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -230,7 +256,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
 
     @app.get("/telegram", response_class=HTMLResponse)
-    async def telegram_account(request: Request):
+    async def telegram_account(request: Request, _: None = Depends(require_telegram_admin)):
         return templates.TemplateResponse(
             request,
             "telegram.html",
@@ -238,7 +264,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     @app.post("/telegram/send-code", response_class=HTMLResponse)
-    async def telegram_send_code(request: Request, phone: str = Form()):
+    async def telegram_send_code(
+        request: Request,
+        phone: str = Form(),
+        _: None = Depends(require_telegram_admin),
+    ):
         try:
             await telegram_user.send_code(phone)
             message = "Код отправлен в Telegram."
@@ -257,6 +287,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request: Request,
         code: str = Form(default=""),
         password: str = Form(default=""),
+        _: None = Depends(require_telegram_admin),
     ):
         try:
             await telegram_user.verify(code, password)
@@ -272,7 +303,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     @app.post("/telegram/disconnect")
-    async def telegram_disconnect():
+    async def telegram_disconnect(_: None = Depends(require_telegram_admin)):
         await telegram_user.disconnect_account()
         return RedirectResponse("/telegram", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -284,6 +315,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "public_url_configured": bool(app_settings.public_base_url),
             "telegram_user_configured": telegram_user.configured,
             "telegram_user_connected": telegram_user.connected,
+            "telegram_admin_configured": bool(app_settings.telegram_admin_password),
         }
 
     return app

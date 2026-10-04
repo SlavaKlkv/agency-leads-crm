@@ -26,6 +26,7 @@ class Settings:
     public_base_url: str = ""
     telegram_api_id: int | None = None
     telegram_api_hash: str = ""
+    telegram_admin_password: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -43,4 +44,5 @@ class Settings:
             public_base_url=os.getenv("PUBLIC_BASE_URL", "").rstrip("/"),
             telegram_api_id=int(telegram_api_id) if telegram_api_id else None,
             telegram_api_hash=os.getenv("TELEGRAM_API_HASH", ""),
+            telegram_admin_password=os.getenv("TELEGRAM_ADMIN_PASSWORD", ""),
         )

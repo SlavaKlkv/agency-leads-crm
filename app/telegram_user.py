@@ -12,6 +12,9 @@ from telethon.sessions import StringSession
 from .db import Database
 
 
+TELEGRAM_SERVICE_USER_IDS = frozenset({777000})
+
+
 class TelegramUserError(RuntimeError):
     """Ошибка подключения обычного Telegram-аккаунта."""
 
@@ -210,7 +213,11 @@ class TelegramUserService:
         if not event.is_private or event.out:
             return
         sender = await event.get_sender()
-        if sender is None or getattr(sender, "bot", False):
+        if (
+            sender is None
+            or getattr(sender, "bot", False)
+            or getattr(sender, "id", None) in TELEGRAM_SERVICE_USER_IDS
+        ):
             return
         name = " ".join(
             part

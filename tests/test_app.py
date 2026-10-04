@@ -349,11 +349,51 @@ def test_telegram_user_service_does_not_mark_sent_code_as_connected(tmp_path: Pa
     assert service.connected is False
 
 
+def test_telegram_page_requires_admin_password_on_public_service(tmp_path: Path):
+    settings = Settings(
+        database_url=f"sqlite:///{tmp_path / 'telegram-admin.db'}",
+        public_base_url="https://leadroom.example",
+        telegram_admin_password="correct-password",
+    )
+    with TestClient(create_app(settings)) as client:
+        assert client.get("/telegram").status_code == 401
+        assert client.get("/telegram", auth=("admin", "wrong-password")).status_code == 401
+        assert client.get("/telegram", auth=("admin", "correct-password")).status_code == 200
+
+
+def test_public_telegram_page_is_disabled_without_admin_password(tmp_path: Path):
+    settings = Settings(
+        database_url=f"sqlite:///{tmp_path / 'telegram-admin-missing.db'}",
+        public_base_url="https://leadroom.example",
+    )
+    with TestClient(create_app(settings)) as client:
+        assert client.get("/telegram").status_code == 503
+
+
+def test_telegram_service_account_message_is_ignored(tmp_path: Path):
+    database = Database(f"sqlite:///{tmp_path / 'telegram-service-account.db'}")
+    database.initialize()
+    service = TelegramUserService(database, api_id=123, api_hash="test-hash")
+    sender = SimpleNamespace(id=777000, bot=False)
+    event = SimpleNamespace(
+        is_private=True,
+        out=False,
+        chat_id=777000,
+        message=SimpleNamespace(id=10),
+        get_sender=AsyncMock(return_value=sender),
+    )
+
+    asyncio.run(service._handle_message(event))
+
+    assert database.list_leads() == []
+
+
 def test_telegram_handler_downloads_sender_avatar(tmp_path: Path):
     database = Database(f"sqlite:///{tmp_path / 'telegram-handler.db'}")
     database.initialize()
     service = TelegramUserService(database, api_id=123, api_hash="test-hash")
     sender = SimpleNamespace(
+        id=123456,
         bot=False,
         first_name="Анна",
         last_name="Петрова",
