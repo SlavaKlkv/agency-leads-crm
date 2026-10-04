@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .config import Settings
-from .db import DEFAULT_STATUS, LEAD_STATUSES, Database
+from .db import DEFAULT_STATUS, LEAD_SOURCES, LEAD_STATUSES, Database
 from .telegram import TelegramAPIError, TelegramClient, TelegramFlow
 from .telegram_user import TelegramUserError, TelegramUserService
 
@@ -82,6 +82,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request: Request,
         tag: list[int] = Query(default=[]),
         lead_status: str | None = Query(default=None, alias="status"),
+        source: list[str] = Query(default=[]),
         page: int = Query(default=1, ge=1),
         per_page: int = Query(default=DEFAULT_LEADS_PER_PAGE),
     ):
@@ -91,10 +92,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if any(item["value"] == lead_status for item in LEAD_STATUSES)
             else None
         )
+        active_sources = list(
+            dict.fromkeys(item for item in source if item in {source["value"] for source in LEAD_SOURCES})
+        )
         active_per_page = (
             per_page if per_page in LEADS_PER_PAGE_OPTIONS else DEFAULT_LEADS_PER_PAGE
         )
-        total_leads = database.count_leads(active_tags, active_status)
+        total_leads = database.count_leads(active_tags, active_status, active_sources)
         total_pages = max(1, (total_leads + active_per_page - 1) // active_per_page)
         current_page = min(page, total_pages)
 
@@ -120,6 +124,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             query: list[tuple[str, str | int]] = [("tag", tag_id) for tag_id in active_tags]
             if active_status is not None:
                 query.append(("status", active_status))
+            query.extend(("source", source) for source in active_sources)
             if active_per_page != DEFAULT_LEADS_PER_PAGE:
                 query.append(("per_page", active_per_page))
             query.append(("page", target_page))
@@ -132,6 +137,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "leads": database.list_leads(
                     active_tags,
                     active_status,
+                    active_sources,
                     limit=active_per_page,
                     offset=(current_page - 1) * active_per_page,
                 ),
@@ -145,9 +151,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "active_per_page": active_per_page,
                 "per_page_options": LEADS_PER_PAGE_OPTIONS,
                 "tags": database.list_tags(),
+                "sources": database.list_sources(),
                 "statuses": database.list_statuses(),
                 "active_tags": active_tags,
                 "active_status": active_status,
+                "active_sources": active_sources,
                 "app_name": app_settings.app_name,
             },
         )
@@ -246,10 +254,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return RedirectResponse(f"/leads/{lead_id}", status_code=status.HTTP_303_SEE_OTHER)
 
     @app.post("/leads/{lead_id}/delete")
-    async def delete_lead(lead_id: int):
+    async def delete_lead(lead_id: int, return_to: str = Form(default="/")):
         if not database.delete_lead(lead_id):
             raise HTTPException(status_code=404, detail="Лид не найден")
-        return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
+        safe_return_to = return_to if return_to.startswith("/") and not return_to.startswith("//") else "/"
+        return RedirectResponse(safe_return_to, status_code=status.HTTP_303_SEE_OTHER)
 
     @app.post("/leads/{lead_id}/tags")
     async def add_tag(lead_id: int, tag: str = Form(min_length=1, max_length=80)):

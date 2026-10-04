@@ -74,7 +74,8 @@ h1 { font-size: clamp(38px, 6vw, 58px); line-height: 0.98; letter-spacing: -0.05
 .status-filter-success:not(.active) { background: var(--success); color: var(--success-ink); border-color: transparent; }
 .status-filter-danger:not(.active) { background: var(--danger); color: var(--danger-ink); border-color: transparent; }
 .status-filter-neutral:not(.active) { background: var(--accent-soft); color: var(--accent-dark); border-color: transparent; }
-.tag-filter { flex: 0 0 min(240px, 34vw); margin: 0; }
+.filter-menus { display: flex; gap: 10px; flex: 0 0 auto; }
+.tag-filter { flex: 0 0 min(150px, 24vw); margin: 0; }
 .tag-filter-menu { position: relative; }
 .tag-filter-menu summary { cursor: pointer; list-style: none; border: 1px solid var(--line); background: var(--surface); padding: 9px 13px; border-radius: 10px; font-size: 14px; font-weight: 650; }
 .tag-filter-menu summary::-webkit-details-marker { display: none; }
@@ -204,6 +205,8 @@ code { background: var(--accent-soft); border-radius: 5px; padding: 2px 5px; fon
   .filter-bar { align-items: stretch; flex-direction: column; gap: 10px; }
   .filters { flex: none; padding-bottom: 2px; }
   .tag-filter { flex-basis: auto; }
+  .filter-menus { width: 100%; }
+  .source-filter, .tag-filter { flex: 1 1 0; }
   .shell { width: min(100% - 28px, 1120px); padding-top: 38px; }
   .page-heading { align-items: flex-start; }
   .metric { display: none; }

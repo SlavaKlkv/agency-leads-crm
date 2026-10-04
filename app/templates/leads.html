@@ -8,20 +8,47 @@
       <p class="subtitle">Заявки из Telegram и обращения, добавленные вручную</p>
     </div>
     <div class="metric">
-      <span>выбрано</span>
       <strong>{{ total_leads }}</strong>
+      <span>выбрано</span>
     </div>
   </section>
 
   <div class="filter-bar">
   <nav class="filters" aria-label="Фильтр по статусу">
-    <a class="filter {% if active_status is none %}active{% endif %}" href="/{% if active_tags or active_per_page != 10 %}?{% for tag_id in active_tags %}tag={{ tag_id }}&amp;{% endfor %}{% if active_per_page != 10 %}per_page={{ active_per_page }}{% endif %}{% endif %}">Все</a>
+    <a class="filter {% if active_status is none %}active{% endif %}" href="/{% if active_tags or active_sources or active_per_page != 10 %}?{% for tag_id in active_tags %}tag={{ tag_id }}&amp;{% endfor %}{% for source in active_sources %}source={{ source }}&amp;{% endfor %}{% if active_per_page != 10 %}per_page={{ active_per_page }}{% endif %}{% endif %}">Все</a>
     {% for status in statuses %}
-      <a class="filter status-filter status-filter-{{ status.tone }} {% if active_status == status.value %}active{% endif %}" href="/?status={{ status.value|urlencode }}{% for tag_id in active_tags %}&amp;tag={{ tag_id }}{% endfor %}{% if active_per_page != 10 %}&amp;per_page={{ active_per_page }}{% endif %}">
+      <a class="filter status-filter status-filter-{{ status.tone }} {% if active_status == status.value %}active{% endif %}" href="/?status={{ status.value|urlencode }}{% for tag_id in active_tags %}&amp;tag={{ tag_id }}{% endfor %}{% for source in active_sources %}&amp;source={{ source }}{% endfor %}{% if active_per_page != 10 %}&amp;per_page={{ active_per_page }}{% endif %}">
         {{ status.value }} <span>{{ status.lead_count }}</span>
       </a>
     {% endfor %}
   </nav>
+
+  <div class="filter-menus">
+  <div class="tag-filter source-filter">
+    <details class="tag-filter-menu">
+      <summary>Источник{% if active_sources %} · {{ active_sources|length }}{% endif %}</summary>
+      <div class="tag-filter-options">
+        <form id="source-filter-form" action="/" method="get">
+          {% for source in sources %}
+            <div class="tag-filter-option">
+              <label for="source-filter-{{ source.value }}">
+                <input id="source-filter-{{ source.value }}" type="checkbox" name="source" value="{{ source.value }}"{% if source.value in active_sources %} checked{% endif %}>
+                <span>{{ source.label }}</span>
+                <small>{{ source.lead_count }}</small>
+              </label>
+            </div>
+          {% endfor %}
+          <div class="tag-filter-actions">
+            {% if active_sources %}<a href="/{% if active_tags or active_status is not none or active_per_page != 10 %}?{% for tag_id in active_tags %}tag={{ tag_id }}&amp;{% endfor %}{% if active_status is not none %}status={{ active_status|urlencode }}&amp;{% endif %}{% if active_per_page != 10 %}per_page={{ active_per_page }}{% endif %}{% endif %}">Сбросить</a>{% endif %}
+            {% for tag_id in active_tags %}<input type="hidden" name="tag" value="{{ tag_id }}">{% endfor %}
+            {% if active_status is not none %}<input type="hidden" name="status" value="{{ active_status }}">{% endif %}
+            {% if active_per_page != 10 %}<input type="hidden" name="per_page" value="{{ active_per_page }}">{% endif %}
+            <button class="button button-primary" type="submit">Применить</button>
+          </div>
+        </form>
+      </div>
+    </details>
+  </div>
 
   <div class="tag-filter">
     <details class="tag-filter-menu">
@@ -42,15 +69,17 @@
           <p class="muted">Тегов пока нет.</p>
         {% endfor %}
         <div class="tag-filter-actions">
-          {% if active_tags %}<a href="/{% if active_status is not none %}?status={{ active_status|urlencode }}{% if active_per_page != 10 %}&amp;per_page={{ active_per_page }}{% endif %}{% elif active_per_page != 10 %}?per_page={{ active_per_page }}{% endif %}">Сбросить</a>{% endif %}
+          {% if active_tags %}<a href="/{% if active_status is not none or active_sources or active_per_page != 10 %}?{% if active_status is not none %}status={{ active_status|urlencode }}&amp;{% endif %}{% for source in active_sources %}source={{ source }}&amp;{% endfor %}{% if active_per_page != 10 %}per_page={{ active_per_page }}{% endif %}{% endif %}">Сбросить</a>{% endif %}
           <form id="tag-filter-form" action="/" method="get">
             {% if active_status is not none %}<input type="hidden" name="status" value="{{ active_status }}">{% endif %}
+            {% for source in active_sources %}<input type="hidden" name="source" value="{{ source }}">{% endfor %}
             {% if active_per_page != 10 %}<input type="hidden" name="per_page" value="{{ active_per_page }}">{% endif %}
             <button class="button button-primary" type="submit">Применить</button>
           </form>
         </div>
       </div>
     </details>
+  </div>
   </div>
   </div>
 
@@ -94,6 +123,7 @@
             <div class="lead-actions-buttons">
               <a class="icon-button" href="/leads/{{ lead.id }}/edit" title="Редактировать лида" aria-label="Редактировать лида {{ lead.name }}">✎</a>
               <form action="/leads/{{ lead.id }}/delete" method="post" data-delete-lead data-lead-name="{{ lead.name }}">
+                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
                 <button class="icon-button icon-button-danger" type="submit" title="Удалить лида" aria-label="Удалить лида {{ lead.name }}">✕</button>
               </form>
             </div>
@@ -135,6 +165,7 @@
         <form class="pagination-per-page" action="/" method="get">
           {% for tag_id in active_tags %}<input type="hidden" name="tag" value="{{ tag_id }}">{% endfor %}
           {% if active_status is not none %}<input type="hidden" name="status" value="{{ active_status }}">{% endif %}
+          {% for source in active_sources %}<input type="hidden" name="source" value="{{ source }}">{% endfor %}
           <label for="per-page">Показывать</label>
           <select id="per-page" name="per_page" onchange="this.form.requestSubmit()">
             {% for option in per_page_options %}<option value="{{ option }}"{% if option == active_per_page %} selected{% endif %}>{{ option }}</option>{% endfor %}

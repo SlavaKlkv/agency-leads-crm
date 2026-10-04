@@ -92,7 +92,7 @@ def test_manual_lead_tags_and_filter(tmp_path: Path):
             f"/?tag={site_tag['id']}&tag={overdue_tag['id']}"
         )
         assert "Анна" in multi_filtered.text
-        assert "Борис" not in multi_filtered.text
+        assert "Борис" in multi_filtered.text
         assert "Теги · 2" in multi_filtered.text
         assert f'name="tag" value="{site_tag["id"]}" checked' in multi_filtered.text
         assert f'name="tag" value="{overdue_tag["id"]}" checked' in multi_filtered.text
@@ -118,6 +118,70 @@ def test_delete_missing_tag_returns_not_found(tmp_path: Path):
         response = client.post("/tags/999/delete")
 
         assert response.status_code == 404
+
+
+def test_leads_filter_by_source_combines_with_status_and_tags(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        manual_id = client.app.state.database.create_lead(
+            name="Ручной лид",
+            contact="manual@example.com",
+            request_text="Нужна реклама",
+            source="manual",
+            tags=["Реклама"],
+            status="Новый",
+        )
+        client.app.state.database.create_lead(
+            name="Лид из бота",
+            contact="telegram-bot@example.com",
+            request_text="Нужен сайт",
+            source="telegram_bot",
+            tags=["Реклама"],
+            status="Новый",
+        )
+        client.app.state.database.create_lead(
+            name="Лид из аккаунта",
+            contact="telegram-user@example.com",
+            request_text="Нужен дизайн",
+            source="telegram_user",
+            tags=["Реклама"],
+            status="Новый",
+        )
+
+        tag_id = client.app.state.database.get_lead(manual_id)["tags"][0]["id"]
+        filtered = client.get(f"/?tag={tag_id}&status=Новый&source=telegram")
+
+        assert "Ручной лид" not in filtered.text
+        assert "Лид из бота" in filtered.text
+        assert "Лид из аккаунта" in filtered.text
+        assert "Источник · 1" in filtered.text
+        assert 'name="source" value="telegram" checked' in filtered.text
+        assert 'name="source" value="manual"' in filtered.text
+
+
+def test_delete_lead_keeps_active_list_filters(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        lead_id = client.app.state.database.create_lead(
+            name="Лид для удаления",
+            contact="delete@example.com",
+            request_text="Нужна реклама",
+            source="manual",
+            tags=["Реклама"],
+            status="В работе",
+        )
+        tag_id = client.app.state.database.get_lead(lead_id)["tags"][0]["id"]
+        query = f"/?tag={tag_id}&status=%D0%92+%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%B5&source=manual&page=2&per_page=5"
+
+        page = client.get(query)
+        assert f'name="return_to" value="{query.replace("&", "&amp;")}"' in page.text
+
+        deleted = client.post(
+            f"/leads/{lead_id}/delete",
+            data={"return_to": query},
+            follow_redirects=False,
+        )
+
+        assert deleted.status_code == 303
+        assert deleted.headers["location"] == query
 
 
 def test_list_shows_quick_edit_and_delete_actions(tmp_path: Path):

@@ -22,6 +22,15 @@ LEAD_STATUSES = [
     {"value": "Просрочен", "tone": "danger"},
 ]
 
+LEAD_SOURCES = [
+    {"value": "manual", "label": "Вручную", "sources": ("manual",)},
+    {
+        "value": "telegram",
+        "label": "Telegram",
+        "sources": ("telegram_bot", "telegram_user"),
+    },
+]
+
 _STATUS_TONES = {item["value"]: item["tone"] for item in LEAD_STATUSES}
 
 
@@ -400,16 +409,32 @@ class Database:
                 for status in LEAD_STATUSES
             ]
 
+    def list_sources(self) -> list[dict]:
+        with self.session() as session:
+            counts = dict(
+                session.execute(
+                    select(Lead.source, func.count(Lead.id)).group_by(Lead.source)
+                ).all()
+            )
+            return [
+                {
+                    **source,
+                    "lead_count": sum(counts.get(value, 0) for value in source["sources"]),
+                }
+                for source in LEAD_SOURCES
+            ]
+
     def list_leads(
         self,
         tag_ids: list[int] | None = None,
         status: str | None = None,
+        sources: list[str] | None = None,
         *,
         limit: int | None = None,
         offset: int = 0,
     ) -> list[dict]:
         with self.session() as session:
-            statement = self._filtered_leads_statement(tag_ids, status).options(
+            statement = self._filtered_leads_statement(tag_ids, status, sources).options(
                 selectinload(Lead.tags)
             )
             statement = statement.order_by(Lead.created_at.desc(), Lead.id.desc())
@@ -418,17 +443,20 @@ class Database:
             return [self._lead_dict(lead) for lead in session.scalars(statement).all()]
 
     def count_leads(
-        self, tag_ids: list[int] | None = None, status: str | None = None
+        self,
+        tag_ids: list[int] | None = None,
+        status: str | None = None,
+        sources: list[str] | None = None,
     ) -> int:
         with self.session() as session:
-            statement = self._filtered_leads_statement(tag_ids, status).with_only_columns(
+            statement = self._filtered_leads_statement(tag_ids, status, sources).with_only_columns(
                 func.count(Lead.id)
             ).order_by(None)
             return session.scalar(statement) or 0
 
     @staticmethod
     def _filtered_leads_statement(
-        tag_ids: list[int] | None, status: str | None
+        tag_ids: list[int] | None, status: str | None, sources: list[str] | None = None
     ):
         statement = select(Lead)
         selected_tag_ids = list(dict.fromkeys(tag_ids or []))
@@ -436,12 +464,20 @@ class Database:
             matching_leads = (
                 select(lead_tags.c.lead_id)
                 .where(lead_tags.c.tag_id.in_(selected_tag_ids))
-                .group_by(lead_tags.c.lead_id)
-                .having(func.count(func.distinct(lead_tags.c.tag_id)) == len(selected_tag_ids))
+                .distinct()
             )
             statement = statement.where(Lead.id.in_(matching_leads))
         if status in _STATUS_TONES:
             statement = statement.where(Lead.status == status)
+        selected_sources = list(dict.fromkeys(sources or []))
+        source_values = {
+            source_value
+            for source in LEAD_SOURCES
+            if source["value"] in selected_sources
+            for source_value in source["sources"]
+        }
+        if source_values:
+            statement = statement.where(Lead.source.in_(source_values))
         return statement
 
     def get_lead(self, lead_id: int) -> dict | None:
