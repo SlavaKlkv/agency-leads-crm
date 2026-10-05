@@ -16,6 +16,8 @@
   --success-ink: #25643a;
   --danger: #fbe8e7;
   --danger-ink: #a13a35;
+  --overdue: #fee7de;
+  --overdue-ink: #b34e2c;
   --manual: #f0eafb;
   --manual-ink: #6843a5;
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -73,6 +75,7 @@ h1 { font-size: clamp(38px, 6vw, 58px); line-height: 0.98; letter-spacing: -0.05
 .status-filter-warning:not(.active) { background: var(--warning); color: var(--warning-ink); border-color: transparent; }
 .status-filter-success:not(.active) { background: var(--success); color: var(--success-ink); border-color: transparent; }
 .status-filter-danger:not(.active) { background: var(--danger); color: var(--danger-ink); border-color: transparent; }
+.status-filter-overdue:not(.active) { background: var(--overdue); color: var(--overdue-ink); border-color: transparent; }
 .status-filter-neutral:not(.active) { background: var(--accent-soft); color: var(--accent-dark); border-color: transparent; }
 .filter-menus { display: flex; gap: 10px; flex: 0 0 auto; }
 .lead-sort { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--muted); font-size: 13px; font-weight: 700; white-space: nowrap; }
@@ -157,6 +160,7 @@ h1 { font-size: clamp(38px, 6vw, 58px); line-height: 0.98; letter-spacing: -0.05
 .status-warning { background: var(--warning); color: var(--warning-ink); }
 .status-success { background: var(--success); color: var(--success-ink); }
 .status-danger { background: var(--danger); color: var(--danger-ink); }
+.status-overdue { background: var(--overdue); color: var(--overdue-ink); }
 .status-neutral { background: var(--accent-soft); color: var(--accent-dark); }
 
 .empty-state { padding: 80px 24px; border: 1px dashed #cbd0d9; border-radius: 18px; text-align: center; background: rgba(255,255,255,.62); }

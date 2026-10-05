@@ -19,7 +19,7 @@ LEAD_STATUSES = [
     {"value": "В работе", "tone": "neutral"},
     {"value": "Успешно", "tone": "success"},
     {"value": "Отказ", "tone": "danger"},
-    {"value": "Просрочен", "tone": "danger"},
+    {"value": "Просрочен", "tone": "overdue"},
 ]
 
 LEAD_SOURCES = [

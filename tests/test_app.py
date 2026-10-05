@@ -107,6 +107,9 @@ def test_manual_lead_tags_and_filter(tmp_path: Path):
         assert "Анна" in status_filtered.text
         assert 'class="filter status-filter status-filter-success active"' in status_filtered.text
 
+        overdue_status = client.get("/?status=Просрочен")
+        assert 'class="filter status-filter status-filter-overdue active"' in overdue_status.text
+
         empty_filter = client.get(f"/?tag={site_tag['id']}&status=Отказ")
         assert "Анна" not in empty_filter.text
 
