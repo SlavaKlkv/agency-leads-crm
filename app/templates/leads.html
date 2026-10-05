@@ -44,15 +44,17 @@
       <summary>Источник{% if active_sources %} · {{ active_sources|length }}{% endif %}</summary>
       <div class="tag-filter-options">
         <form id="source-filter-form" action="/" method="get">
-          {% for source in sources %}
-            <div class="tag-filter-option">
-              <label for="source-filter-{{ source.value }}">
-                <input id="source-filter-{{ source.value }}" type="checkbox" name="source" value="{{ source.value }}"{% if source.value in active_sources %} checked{% endif %}>
-                <span>{{ source.label }}</span>
-                <small>{{ source.lead_count }}</small>
-              </label>
-            </div>
-          {% endfor %}
+          <div class="tag-filter-scroll">
+            {% for source in sources %}
+              <div class="tag-filter-option">
+                <label for="source-filter-{{ source.value }}">
+                  <input id="source-filter-{{ source.value }}" type="checkbox" name="source" value="{{ source.value }}"{% if source.value in active_sources %} checked{% endif %}>
+                  <span>{{ source.label }}</span>
+                  <small>{{ source.lead_count }}</small>
+                </label>
+              </div>
+            {% endfor %}
+          </div>
           <div class="tag-filter-actions">
             {% if active_sources %}<a href="/{% if active_tags or active_status is not none or active_per_page != 10 or active_sort != 'newest' or active_search or active_created_from or active_created_to %}?{% for tag_id in active_tags %}tag={{ tag_id }}&amp;{% endfor %}{% if active_status is not none %}status={{ active_status|urlencode }}&amp;{% endif %}{% if active_search %}search={{ active_search|urlencode }}&amp;{% endif %}{% if active_created_from %}created_from={{ active_created_from }}&amp;{% endif %}{% if active_created_to %}created_to={{ active_created_to }}&amp;{% endif %}{% if active_sort != 'newest' %}sort={{ active_sort }}&amp;{% endif %}{% if active_per_page != 10 %}per_page={{ active_per_page }}{% endif %}{% endif %}">Сбросить</a>{% endif %}
             {% for tag_id in active_tags %}<input type="hidden" name="tag" value="{{ tag_id }}">{% endfor %}
@@ -73,20 +75,22 @@
     <details class="tag-filter-menu">
       <summary>Теги{% if active_tags %} · {{ active_tags|length }}{% endif %}</summary>
       <div class="tag-filter-options">
-        {% for tag in tags %}
-          <div class="tag-filter-option">
-            <label for="tag-filter-{{ tag.id }}">
-              <input id="tag-filter-{{ tag.id }}" form="tag-filter-form" type="checkbox" name="tag" value="{{ tag.id }}"{% if tag.id in active_tags %} checked{% endif %}>
-              <span>{{ tag.name }}</span>
-              <small>{{ tag.lead_count }}</small>
-            </label>
-            <form action="/tags/{{ tag.id }}/delete" method="post" data-delete-tag data-tag-name="{{ tag.name }}">
-              <button class="tag-filter-delete" type="submit" title="Удалить тег" aria-label="Удалить тег {{ tag.name }}">×</button>
-            </form>
-          </div>
-        {% else %}
-          <p class="muted">Тегов пока нет.</p>
-        {% endfor %}
+        <div class="tag-filter-scroll">
+          {% for tag in tags %}
+            <div class="tag-filter-option">
+              <label for="tag-filter-{{ tag.id }}">
+                <input id="tag-filter-{{ tag.id }}" form="tag-filter-form" type="checkbox" name="tag" value="{{ tag.id }}"{% if tag.id in active_tags %} checked{% endif %}>
+                <span>{{ tag.name }}</span>
+                <small>{{ tag.lead_count }}</small>
+              </label>
+              <form action="/tags/{{ tag.id }}/delete" method="post" data-delete-tag data-tag-name="{{ tag.name }}">
+                <button class="tag-filter-delete" type="submit" title="Удалить тег" aria-label="Удалить тег {{ tag.name }}">×</button>
+              </form>
+            </div>
+          {% else %}
+            <p class="muted">Тегов пока нет.</p>
+          {% endfor %}
+        </div>
         <div class="tag-filter-actions">
           {% if active_tags %}<a href="/{% if active_status is not none or active_sources or active_per_page != 10 or active_sort != 'newest' or active_search or active_created_from or active_created_to %}?{% if active_status is not none %}status={{ active_status|urlencode }}&amp;{% endif %}{% for source in active_sources %}source={{ source }}&amp;{% endfor %}{% if active_search %}search={{ active_search|urlencode }}&amp;{% endif %}{% if active_created_from %}created_from={{ active_created_from }}&amp;{% endif %}{% if active_created_to %}created_to={{ active_created_to }}&amp;{% endif %}{% if active_sort != 'newest' %}sort={{ active_sort }}&amp;{% endif %}{% if active_per_page != 10 %}per_page={{ active_per_page }}{% endif %}{% endif %}">Сбросить</a>{% endif %}
           <form id="tag-filter-form" action="/" method="get">
