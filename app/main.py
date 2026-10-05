@@ -21,10 +21,15 @@ APP_DIR = Path(__file__).parent
 DEFAULT_LEADS_PER_PAGE = 10
 LEADS_PER_PAGE_OPTIONS = (5, 10)
 LEAD_SORT_OPTIONS = (
-    ("newest", "Сначала новые"),
-    ("oldest", "Сначала старые"),
+    ("created", "По созданию"),
+    ("updated", "По обновлению"),
+    ("deadline", "По сроку"),
+    ("name", "По имени"),
+    ("status", "По этапу"),
 )
-DEFAULT_LEAD_SORT = "newest"
+LEAD_SORT_DIRECTIONS = {"asc", "desc"}
+DEFAULT_LEAD_SORT = "created"
+DEFAULT_LEAD_SORT_DIRECTION = "desc"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -69,6 +74,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         created_from: str = Query(default=""),
         created_to: str = Query(default=""),
         sort: str = Query(default=DEFAULT_LEAD_SORT),
+        direction: str = Query(default=DEFAULT_LEAD_SORT_DIRECTION),
         page: int = Query(default=1, ge=1),
         per_page: int = Query(default=DEFAULT_LEADS_PER_PAGE),
     ):
@@ -84,7 +90,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         active_per_page = (
             per_page if per_page in LEADS_PER_PAGE_OPTIONS else DEFAULT_LEADS_PER_PAGE
         )
-        active_sort = sort if sort in dict(LEAD_SORT_OPTIONS) else DEFAULT_LEAD_SORT
+        if sort in {"newest", "oldest"}:
+            active_sort = DEFAULT_LEAD_SORT
+            active_direction = "desc" if sort == "newest" else "asc"
+        else:
+            active_sort = sort if sort in dict(LEAD_SORT_OPTIONS) else DEFAULT_LEAD_SORT
+            active_direction = (
+                direction if direction in LEAD_SORT_DIRECTIONS else DEFAULT_LEAD_SORT_DIRECTION
+            )
         active_search = search.strip()
         try:
             active_created_from = date.fromisoformat(created_from) if created_from else None
@@ -94,6 +107,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             active_created_to = date.fromisoformat(created_to) if created_to else None
         except ValueError:
             active_created_to = None
+        resettable_filter_count = (
+            len(active_tags)
+            + len(active_sources)
+            + bool(active_search)
+            + bool(active_created_from)
+            + bool(active_created_to)
+        )
+        filter_count = (
+            resettable_filter_count
+            + bool(active_status)
+            + (active_sort != DEFAULT_LEAD_SORT or active_direction != DEFAULT_LEAD_SORT_DIRECTION)
+        )
         total_leads = database.count_leads(
             active_tags, active_status, active_sources, active_search, active_created_from, active_created_to
         )
@@ -131,6 +156,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 query.append(("created_to", active_created_to.isoformat()))
             if active_sort != DEFAULT_LEAD_SORT:
                 query.append(("sort", active_sort))
+            if active_direction != DEFAULT_LEAD_SORT_DIRECTION:
+                query.append(("direction", active_direction))
             if active_per_page != DEFAULT_LEADS_PER_PAGE:
                 query.append(("per_page", active_per_page))
             query.append(("page", target_page))
@@ -148,6 +175,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     active_created_from,
                     active_created_to,
                     sort=active_sort,
+                    direction=active_direction,
                     limit=active_per_page,
                     offset=(current_page - 1) * active_per_page,
                 ),
@@ -169,7 +197,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "active_search": active_search,
                 "active_created_from": active_created_from.isoformat() if active_created_from else "",
                 "active_created_to": active_created_to.isoformat() if active_created_to else "",
+                "show_reset_filters": filter_count >= 2,
                 "active_sort": active_sort,
+                "active_direction": active_direction,
+                "inverse_sort_direction": "asc" if active_direction == "desc" else "desc",
                 "sort_options": LEAD_SORT_OPTIONS,
                 "app_name": app_settings.app_name,
             },

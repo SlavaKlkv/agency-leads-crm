@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Лиды · {{ app_name }}{% endblock %}
 {% block content %}
+<div data-preserve-list-scroll>
   <section class="page-heading">
     <div>
       <p class="eyebrow">Мини-CRM агентства</p>
@@ -14,10 +15,10 @@
   </section>
 
   <div class="filter-bar">
-  <nav class="filters" aria-label="Фильтр по статусу">
-    <a class="filter {% if active_status is none %}active{% endif %}" href="/{% if active_tags or active_sources or active_per_page != 10 or active_sort != 'newest' or active_search or active_created_from or active_created_to %}?{% for tag_id in active_tags %}tag={{ tag_id }}&amp;{% endfor %}{% for source in active_sources %}source={{ source }}&amp;{% endfor %}{% if active_search %}search={{ active_search|urlencode }}&amp;{% endif %}{% if active_created_from %}created_from={{ active_created_from }}&amp;{% endif %}{% if active_created_to %}created_to={{ active_created_to }}&amp;{% endif %}{% if active_sort != 'newest' %}sort={{ active_sort }}&amp;{% endif %}{% if active_per_page != 10 %}per_page={{ active_per_page }}{% endif %}{% endif %}">Все</a>
+  <nav class="filters" id="lead-status-filters" aria-label="Фильтр по статусу">
+    <a class="filter {% if active_status is none %}active{% endif %}" href="/{% if active_tags or active_sources or active_per_page != 10 or active_sort != 'created' or active_direction != 'desc' or active_search or active_created_from or active_created_to %}?{% for tag_id in active_tags %}tag={{ tag_id }}&amp;{% endfor %}{% for source in active_sources %}source={{ source }}&amp;{% endfor %}{% if active_search %}search={{ active_search|urlencode }}&amp;{% endif %}{% if active_created_from %}created_from={{ active_created_from }}&amp;{% endif %}{% if active_created_to %}created_to={{ active_created_to }}&amp;{% endif %}{% if active_sort != 'created' %}sort={{ active_sort }}&amp;{% endif %}{% if active_direction != 'desc' %}direction={{ active_direction }}&amp;{% endif %}{% if active_per_page != 10 %}per_page={{ active_per_page }}{% endif %}{% endif %}">Все</a>
     {% for status in statuses %}
-      <a class="filter status-filter status-filter-{{ status.tone }} {% if active_status == status.value %}active{% endif %}" href="/?status={{ status.value|urlencode }}{% for tag_id in active_tags %}&amp;tag={{ tag_id }}{% endfor %}{% for source in active_sources %}&amp;source={{ source }}{% endfor %}{% if active_search %}&amp;search={{ active_search|urlencode }}{% endif %}{% if active_created_from %}&amp;created_from={{ active_created_from }}{% endif %}{% if active_created_to %}&amp;created_to={{ active_created_to }}{% endif %}{% if active_sort != 'newest' %}&amp;sort={{ active_sort }}{% endif %}{% if active_per_page != 10 %}&amp;per_page={{ active_per_page }}{% endif %}">
+      <a class="filter status-filter status-filter-{{ status.tone }} {% if active_status == status.value %}active{% endif %}" href="/?status={{ status.value|urlencode }}{% for tag_id in active_tags %}&amp;tag={{ tag_id }}{% endfor %}{% for source in active_sources %}&amp;source={{ source }}{% endfor %}{% if active_search %}&amp;search={{ active_search|urlencode }}{% endif %}{% if active_created_from %}&amp;created_from={{ active_created_from }}{% endif %}{% if active_created_to %}&amp;created_to={{ active_created_to }}{% endif %}{% if active_sort != 'created' %}&amp;sort={{ active_sort }}{% endif %}{% if active_direction != 'desc' %}&amp;direction={{ active_direction }}{% endif %}{% if active_per_page != 10 %}&amp;per_page={{ active_per_page }}{% endif %}">
         {{ status.value }} <span>{{ status.lead_count }}</span>
       </a>
     {% endfor %}
@@ -27,7 +28,8 @@
     {% for tag_id in active_tags %}<input type="hidden" name="tag" value="{{ tag_id }}">{% endfor %}
     {% if active_status is not none %}<input type="hidden" name="status" value="{{ active_status }}">{% endif %}
     {% for source in active_sources %}<input type="hidden" name="source" value="{{ source }}">{% endfor %}
-    {% if active_sort != 'newest' %}<input type="hidden" name="sort" value="{{ active_sort }}">{% endif %}
+    {% if active_sort != 'created' %}<input type="hidden" name="sort" value="{{ active_sort }}">{% endif %}
+    {% if active_direction != 'desc' %}<input type="hidden" name="direction" value="{{ active_direction }}">{% endif %}
     {% if active_per_page != 10 %}<input type="hidden" name="per_page" value="{{ active_per_page }}">{% endif %}
     <label class="sr-only" for="lead-search">Поиск</label>
     <input id="lead-search" name="search" type="search" value="{{ active_search }}" placeholder="Поиск по имени, контакту или заявке">
@@ -56,13 +58,14 @@
             {% endfor %}
           </div>
           <div class="tag-filter-actions">
-            {% if active_sources %}<a href="/{% if active_tags or active_status is not none or active_per_page != 10 or active_sort != 'newest' or active_search or active_created_from or active_created_to %}?{% for tag_id in active_tags %}tag={{ tag_id }}&amp;{% endfor %}{% if active_status is not none %}status={{ active_status|urlencode }}&amp;{% endif %}{% if active_search %}search={{ active_search|urlencode }}&amp;{% endif %}{% if active_created_from %}created_from={{ active_created_from }}&amp;{% endif %}{% if active_created_to %}created_to={{ active_created_to }}&amp;{% endif %}{% if active_sort != 'newest' %}sort={{ active_sort }}&amp;{% endif %}{% if active_per_page != 10 %}per_page={{ active_per_page }}{% endif %}{% endif %}">Сбросить</a>{% endif %}
+            {% if active_sources %}<a href="/{% if active_tags or active_status is not none or active_per_page != 10 or active_sort != 'created' or active_direction != 'desc' or active_search or active_created_from or active_created_to %}?{% for tag_id in active_tags %}tag={{ tag_id }}&amp;{% endfor %}{% if active_status is not none %}status={{ active_status|urlencode }}&amp;{% endif %}{% if active_search %}search={{ active_search|urlencode }}&amp;{% endif %}{% if active_created_from %}created_from={{ active_created_from }}&amp;{% endif %}{% if active_created_to %}created_to={{ active_created_to }}&amp;{% endif %}{% if active_sort != 'created' %}sort={{ active_sort }}&amp;{% endif %}{% if active_direction != 'desc' %}direction={{ active_direction }}&amp;{% endif %}{% if active_per_page != 10 %}per_page={{ active_per_page }}{% endif %}{% endif %}">Сбросить</a>{% endif %}
             {% for tag_id in active_tags %}<input type="hidden" name="tag" value="{{ tag_id }}">{% endfor %}
             {% if active_status is not none %}<input type="hidden" name="status" value="{{ active_status }}">{% endif %}
             {% if active_search %}<input type="hidden" name="search" value="{{ active_search }}">{% endif %}
             {% if active_created_from %}<input type="hidden" name="created_from" value="{{ active_created_from }}">{% endif %}
             {% if active_created_to %}<input type="hidden" name="created_to" value="{{ active_created_to }}">{% endif %}
-            {% if active_sort != 'newest' %}<input type="hidden" name="sort" value="{{ active_sort }}">{% endif %}
+            {% if active_sort != 'created' %}<input type="hidden" name="sort" value="{{ active_sort }}">{% endif %}
+            {% if active_direction != 'desc' %}<input type="hidden" name="direction" value="{{ active_direction }}">{% endif %}
             {% if active_per_page != 10 %}<input type="hidden" name="per_page" value="{{ active_per_page }}">{% endif %}
             <button class="button button-primary" type="submit">Применить</button>
           </div>
@@ -92,14 +95,15 @@
           {% endfor %}
         </div>
         <div class="tag-filter-actions">
-          {% if active_tags %}<a href="/{% if active_status is not none or active_sources or active_per_page != 10 or active_sort != 'newest' or active_search or active_created_from or active_created_to %}?{% if active_status is not none %}status={{ active_status|urlencode }}&amp;{% endif %}{% for source in active_sources %}source={{ source }}&amp;{% endfor %}{% if active_search %}search={{ active_search|urlencode }}&amp;{% endif %}{% if active_created_from %}created_from={{ active_created_from }}&amp;{% endif %}{% if active_created_to %}created_to={{ active_created_to }}&amp;{% endif %}{% if active_sort != 'newest' %}sort={{ active_sort }}&amp;{% endif %}{% if active_per_page != 10 %}per_page={{ active_per_page }}{% endif %}{% endif %}">Сбросить</a>{% endif %}
+          {% if active_tags %}<a href="/{% if active_status is not none or active_sources or active_per_page != 10 or active_sort != 'created' or active_direction != 'desc' or active_search or active_created_from or active_created_to %}?{% if active_status is not none %}status={{ active_status|urlencode }}&amp;{% endif %}{% for source in active_sources %}source={{ source }}&amp;{% endfor %}{% if active_search %}search={{ active_search|urlencode }}&amp;{% endif %}{% if active_created_from %}created_from={{ active_created_from }}&amp;{% endif %}{% if active_created_to %}created_to={{ active_created_to }}&amp;{% endif %}{% if active_sort != 'created' %}sort={{ active_sort }}&amp;{% endif %}{% if active_direction != 'desc' %}direction={{ active_direction }}&amp;{% endif %}{% if active_per_page != 10 %}per_page={{ active_per_page }}{% endif %}{% endif %}">Сбросить</a>{% endif %}
           <form id="tag-filter-form" action="/" method="get">
             {% if active_status is not none %}<input type="hidden" name="status" value="{{ active_status }}">{% endif %}
             {% for source in active_sources %}<input type="hidden" name="source" value="{{ source }}">{% endfor %}
             {% if active_search %}<input type="hidden" name="search" value="{{ active_search }}">{% endif %}
             {% if active_created_from %}<input type="hidden" name="created_from" value="{{ active_created_from }}">{% endif %}
             {% if active_created_to %}<input type="hidden" name="created_to" value="{{ active_created_to }}">{% endif %}
-            {% if active_sort != 'newest' %}<input type="hidden" name="sort" value="{{ active_sort }}">{% endif %}
+            {% if active_sort != 'created' %}<input type="hidden" name="sort" value="{{ active_sort }}">{% endif %}
+            {% if active_direction != 'desc' %}<input type="hidden" name="direction" value="{{ active_direction }}">{% endif %}
             {% if active_per_page != 10 %}<input type="hidden" name="per_page" value="{{ active_per_page }}">{% endif %}
             <button class="button button-primary" type="submit">Применить</button>
           </form>
@@ -115,11 +119,18 @@
     {% if active_created_from %}<input type="hidden" name="created_from" value="{{ active_created_from }}">{% endif %}
     {% if active_created_to %}<input type="hidden" name="created_to" value="{{ active_created_to }}">{% endif %}
     {% if active_per_page != 10 %}<input type="hidden" name="per_page" value="{{ active_per_page }}">{% endif %}
-    <label class="sr-only" for="lead-sort">Порядок лидов</label>
-    <select id="lead-sort" name="sort" aria-label="Порядок лидов" onchange="this.form.requestSubmit()">
-      {% for value, label in sort_options %}<option value="{{ value }}"{% if value == active_sort %} selected{% endif %}>{{ label }}</option>{% endfor %}
-    </select>
+    <input type="hidden" name="direction" value="{{ active_direction }}">
+    <div class="sort-select">
+      <label class="sr-only" for="lead-sort">Поле сортировки</label>
+      <select id="lead-sort" name="sort" aria-label="Поле сортировки" onchange="this.form.requestSubmit()">
+        {% for value, label in sort_options %}<option value="{{ value }}"{% if value == active_sort %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="sort-direction sort-direction-{{ active_direction }}" type="button" title="Инвертировать сортировку" aria-label="Инвертировать сортировку" onclick="this.form.elements.direction.value='{{ inverse_sort_direction }}'; this.form.requestSubmit()"></button>
   </form>
+  {% if show_reset_filters %}
+    <a class="button button-reset-filters" href="/">Сбросить всё</a>
+  {% endif %}
   </div>
 
   </div>
@@ -211,7 +222,8 @@
           {% if active_search %}<input type="hidden" name="search" value="{{ active_search }}">{% endif %}
           {% if active_created_from %}<input type="hidden" name="created_from" value="{{ active_created_from }}">{% endif %}
           {% if active_created_to %}<input type="hidden" name="created_to" value="{{ active_created_to }}">{% endif %}
-          {% if active_sort != 'newest' %}<input type="hidden" name="sort" value="{{ active_sort }}">{% endif %}
+          {% if active_sort != 'created' %}<input type="hidden" name="sort" value="{{ active_sort }}">{% endif %}
+          {% if active_direction != 'desc' %}<input type="hidden" name="direction" value="{{ active_direction }}">{% endif %}
           <label for="per-page">Показывать</label>
           <select id="per-page" name="per_page" onchange="this.form.requestSubmit()">
             {% for option in per_page_options %}<option value="{{ option }}"{% if option == active_per_page %} selected{% endif %}>{{ option }}</option>{% endfor %}
@@ -227,8 +239,36 @@
       <a class="button button-primary" href="/leads/new">Добавить лида</a>
     </section>
   {% endif %}
+</div>
 
   <script>
+    const listPage = document.querySelector("[data-preserve-list-scroll]");
+    const rememberListScroll = (anchor = "viewport") => {
+      try {
+        sessionStorage.setItem("lead-list-scroll", JSON.stringify({
+          anchor,
+          y: window.scrollY,
+          savedAt: Date.now(),
+        }));
+      } catch (error) {
+        // Navigation still works when session storage is unavailable.
+      }
+    };
+
+    listPage.addEventListener("click", (event) => {
+      const link = event.target.closest("a[href]");
+      if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const target = new URL(link.href, window.location.href);
+      if (target.origin === window.location.origin && target.pathname === "/") {
+        rememberListScroll(link.closest(".pagination") ? "statuses" : "viewport");
+      }
+    });
+
+    listPage.addEventListener("submit", (event) => {
+      if (event.defaultPrevented) return;
+      rememberListScroll(event.target.closest(".pagination") ? "statuses" : "viewport");
+    });
+
     const deleteTagDialog = document.querySelector("#delete-tag-dialog");
     const deleteTagName = document.querySelector("#delete-tag-name");
     let pendingDeleteTagForm = null;
@@ -244,8 +284,11 @@
     });
 
     document.querySelector("#delete-tag-cancel").addEventListener("click", () => {
-      pendingDeleteTagForm = null;
       deleteTagDialog.close();
+    });
+
+    deleteTagDialog.addEventListener("close", () => {
+      pendingDeleteTagForm = null;
     });
 
     document.querySelector("#delete-tag-confirm").addEventListener("click", () => {
@@ -269,8 +312,11 @@
     });
 
     document.querySelector("#delete-lead-cancel").addEventListener("click", () => {
-      pendingDeleteLeadForm = null;
       deleteLeadDialog.close();
+    });
+
+    deleteLeadDialog.addEventListener("close", () => {
+      pendingDeleteLeadForm = null;
     });
 
     document.querySelector("#delete-lead-confirm").addEventListener("click", () => {

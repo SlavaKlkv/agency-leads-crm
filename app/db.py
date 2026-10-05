@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from datetime import date, datetime, time, timedelta
 from typing import Iterator
 
-from sqlalchemy import Column, DateTime, ForeignKey, LargeBinary, String, Table, Text, create_engine, func, inspect, select, text
+from sqlalchemy import Column, DateTime, ForeignKey, LargeBinary, String, Table, Text, case, create_engine, func, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, selectinload
 
 
@@ -69,6 +69,7 @@ class Lead(Base):
     telegram_chat_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     avatar: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
     tags: Mapped[list["Tag"]] = relationship(secondary=lead_tags, back_populates="leads")
 
 
@@ -115,6 +116,25 @@ class Database:
         self._migrate_status_column()
         self._migrate_deadline_column()
         self._migrate_avatar_column()
+        self._migrate_updated_at_column()
+
+    def _migrate_updated_at_column(self) -> None:
+        """Добавляет дату последнего изменения в уже созданную таблицу лидов."""
+        inspector = inspect(self.engine)
+        if "leads" not in inspector.get_table_names():
+            return
+        columns = {column["name"] for column in inspector.get_columns("leads")}
+        if "updated_at" in columns:
+            return
+        column_type = "TIMESTAMP" if self.engine.dialect.name == "postgresql" else "DATETIME"
+        with self.engine.begin() as connection:
+            _ = connection.execute(text(f"ALTER TABLE leads ADD COLUMN updated_at {column_type}"))
+            _ = connection.execute(
+                text(
+                    "UPDATE leads SET updated_at = COALESCE(created_at, CURRENT_TIMESTAMP) "
+                    "WHERE updated_at IS NULL"
+                )
+            )
 
     def _migrate_deadline_column(self) -> None:
         """Добавляет срок и заполняет его для существующих просроченных лидов."""
@@ -235,6 +255,7 @@ class Database:
             deadline=deadline,
             telegram_chat_id=telegram_chat_id,
             avatar=avatar,
+            updated_at=datetime.now(),
         )
         session.add(lead)
         for tag_name in tags or []:
@@ -330,6 +351,7 @@ class Database:
                     tag = self._get_or_create_tag(session, tag_name)
                     if tag and tag not in lead.tags:
                         lead.tags.append(tag)
+            lead.updated_at = datetime.now()
             return True
 
     def delete_lead(self, lead_id: int) -> bool:
@@ -379,18 +401,25 @@ class Database:
             tag = self._get_or_create_tag(session, tag_name)
             if tag and tag not in lead.tags:
                 lead.tags.append(tag)
+                lead.updated_at = datetime.now()
 
     def remove_tag(self, lead_id: int, tag_id: int) -> None:
         with self.session() as session:
             lead = session.scalar(select(Lead).options(selectinload(Lead.tags)).where(Lead.id == lead_id))
             if lead:
-                lead.tags = [tag for tag in lead.tags if tag.id != tag_id]
+                remaining_tags = [tag for tag in lead.tags if tag.id != tag_id]
+                if len(remaining_tags) != len(lead.tags):
+                    lead.tags = remaining_tags
+                    lead.updated_at = datetime.now()
 
     def delete_tag(self, tag_id: int) -> bool:
         with self.session() as session:
             tag = session.scalar(select(Tag).options(selectinload(Tag.leads)).where(Tag.id == tag_id))
             if tag is None:
                 return False
+            changed_at = datetime.now()
+            for lead in tag.leads:
+                lead.updated_at = changed_at
             tag.leads.clear()
             session.delete(tag)
             return True
@@ -445,7 +474,8 @@ class Database:
         created_from: date | None = None,
         created_to: date | None = None,
         *,
-        sort: str = "newest",
+        sort: str = "created",
+        direction: str = "desc",
         limit: int | None = None,
         offset: int = 0,
     ) -> list[dict]:
@@ -453,10 +483,36 @@ class Database:
             statement = self._filtered_leads_statement(tag_ids, status, sources, search, created_from, created_to).options(
                 selectinload(Lead.tags)
             )
-            if sort == "oldest":
-                statement = statement.order_by(Lead.created_at.asc(), Lead.id.asc())
+            descending = direction != "asc"
+            direction_method = "desc" if descending else "asc"
+            if sort == "updated":
+                sort_column = Lead.updated_at
+            elif sort == "deadline":
+                sort_column = Lead.deadline
+                statement = statement.order_by(
+                    case((Lead.deadline.is_(None), 1), else_=0)
+                )
+            elif sort == "name":
+                sort_column = func.lower(Lead.name)
+            elif sort == "status":
+                overdue = (
+                    Lead.deadline.is_not(None)
+                    & (Lead.deadline < date.today())
+                    & Lead.status.in_(_OVERDUE_ELIGIBLE_STATUSES)
+                )
+                sort_column = case(
+                    (overdue, 4),
+                    (Lead.status == "Новый", 0),
+                    (Lead.status == "В работе", 1),
+                    (Lead.status == "Успешно", 2),
+                    (Lead.status == "Отказ", 3),
+                    else_=5,
+                )
             else:
-                statement = statement.order_by(Lead.created_at.desc(), Lead.id.desc())
+                sort_column = Lead.created_at
+            ordered_column = getattr(sort_column, direction_method)()
+            ordered_id = Lead.id.desc() if descending else Lead.id.asc()
+            statement = statement.order_by(ordered_column, ordered_id)
             if limit is not None:
                 statement = statement.limit(limit).offset(offset)
             return [self._lead_dict(lead) for lead in session.scalars(statement).all()]
@@ -548,6 +604,7 @@ class Database:
             "telegram_chat_id": lead.telegram_chat_id,
             "has_avatar": lead.avatar is not None,
             "created_at": lead.created_at,
+            "updated_at": lead.updated_at,
             "tags": [
                 {"id": tag.id, "name": tag.name, "tone": tag_tone(tag.name)}
                 for tag in sorted(lead.tags, key=lambda item: item.name.lower())

@@ -38,7 +38,20 @@ def test_manual_lead_tags_and_filter(tmp_path: Path):
     with make_client(tmp_path) as client:
         landing = client.get("/")
         assert 'document.querySelectorAll("details[open]")' in landing.text
+        assert 'document.querySelectorAll("dialog[open]")' in landing.text
+        assert 'lastInteractionWasPointer = true' in landing.text
+        assert 'requestAnimationFrame(blurPointerFocus)' in landing.text
+        assert 'document.activeElement.blur()' in landing.text
         assert 'event.key !== "Escape"' in landing.text
+        assert 'openDialog.close()' in landing.text
+        assert 'deleteTagDialog.addEventListener("close"' in landing.text
+        assert 'deleteLeadDialog.addEventListener("close"' in landing.text
+        assert '/style.css?v=10' in landing.text
+        assert 'data-preserve-list-scroll' in landing.text
+        assert 'sessionStorage.setItem("lead-list-scroll"' in landing.text
+        assert 'id="lead-status-filters"' in landing.text
+        assert 'statusFilters.scrollIntoView({' in landing.text
+        assert 'behavior: reduceMotion ? "auto" : "smooth"' in landing.text
 
         response = client.post(
             "/leads",
@@ -250,19 +263,86 @@ def test_leads_pagination_preserves_filters(tmp_path: Path):
         assert f'href="/?tag={tag_id}&amp;status=%D0%92+%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%B5&amp;page=1"' in second_page.text
 
 
-def test_leads_can_be_sorted_oldest_first_and_preserve_filters(tmp_path: Path):
+def test_leads_can_be_sorted_by_field_and_inverted_while_preserving_filters(tmp_path: Path):
     with make_client(tmp_path) as client:
         for number in range(3):
             client.app.state.database.create_lead(
                 name=f"Лид №{number}", contact=f"lead{number}@example.com", request_text="Запрос", source="manual"
             )
 
-        page = client.get("/?sort=oldest")
+        page = client.get("/?sort=created&direction=asc")
 
         assert page.status_code == 200
         assert page.text.index("Лид №0") < page.text.index("Лид №2")
-        assert '<option value="oldest" selected>Сначала старые</option>' in page.text
-        assert 'name="sort" value="oldest"' in page.text
+        assert '<option value="created" selected>По созданию</option>' in page.text
+        assert 'name="direction" value="asc"' in page.text
+        assert 'class="sort-direction sort-direction-asc"' in page.text
+
+
+def test_all_lead_sort_fields_support_both_directions(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        first = client.app.state.database.create_lead(
+            name="Анна", contact="anna@example.com", request_text="Первая", source="manual",
+            status="Новый", deadline=date(2026, 10, 10),
+        )
+        second = client.app.state.database.create_lead(
+            name="Борис", contact="boris@example.com", request_text="Вторая", source="manual",
+            status="Отказ", deadline=None,
+        )
+        with client.app.state.database.session() as session:
+            from app.db import Lead
+
+            first_lead = session.get(Lead, first)
+            second_lead = session.get(Lead, second)
+            first_lead.created_at = datetime(2026, 10, 1, 12, 0)
+            first_lead.updated_at = datetime(2026, 10, 4, 12, 0)
+            second_lead.created_at = datetime(2026, 10, 2, 12, 0)
+            second_lead.updated_at = datetime(2026, 10, 3, 12, 0)
+
+        expected = {
+            "created": ("Анна", "Борис"),
+            "updated": ("Борис", "Анна"),
+            "name": ("Анна", "Борис"),
+            "status": ("Анна", "Борис"),
+        }
+        for sort, (ascending_first, descending_first) in expected.items():
+            ascending = client.get(f"/?sort={sort}&direction=asc")
+            descending = client.get(f"/?sort={sort}&direction=desc")
+
+            assert ascending.text.index(ascending_first) < ascending.text.index(descending_first)
+            assert descending.text.index(descending_first) < descending.text.index(ascending_first)
+
+        # Заявки без срока остаются в конце в обоих направлениях.
+        deadline_asc = client.get("/?sort=deadline&direction=asc")
+        deadline_desc = client.get("/?sort=deadline&direction=desc")
+        assert deadline_asc.text.index("Анна") < deadline_asc.text.index("Борис")
+        assert deadline_desc.text.index("Анна") < deadline_desc.text.index("Борис")
+
+
+def test_lead_updated_at_changes_for_content_and_tag_updates(tmp_path: Path):
+    database = Database(f"sqlite:///{tmp_path / 'updated-at.db'}")
+    database.initialize()
+    lead_id = database.create_lead(
+        name="Анна", contact="anna@example.com", request_text="Запрос", source="manual"
+    )
+    old_timestamp = datetime(2020, 1, 1, 12, 0)
+    with database.session() as session:
+        from app.db import Lead
+
+        session.get(Lead, lead_id).updated_at = old_timestamp
+
+    database.add_tag(lead_id, "Важно")
+    after_tag = database.get_lead(lead_id)["updated_at"]
+    assert after_tag > old_timestamp
+
+    database.update_lead(
+        lead_id,
+        name="Анна Петрова",
+        contact="anna@example.com",
+        request_text="Уточнённый запрос",
+        status="В работе",
+    )
+    assert database.get_lead(lead_id)["updated_at"] >= after_tag
 
 
 def test_leads_can_be_filtered_by_search_and_created_date_range(tmp_path: Path):
@@ -281,6 +361,14 @@ def test_leads_can_be_filtered_by_search_and_created_date_range(tmp_path: Path):
 
         by_contact = client.get("/?search=7999")
         by_text_and_date = client.get("/?search=%D1%80%D0%B5%D0%BA%D0%BB%D0%B0%D0%BC%D0%B0&created_from=2026-10-03&created_to=2026-10-03")
+
+        assert 'Сбросить всё' not in client.get("/").text
+        assert 'Сбросить всё' not in by_contact.text
+        assert 'Сбросить всё' not in client.get("/?created_from=2026-10-03").text
+        assert 'Сбросить всё' in client.get("/?status=Новый&sort=name&direction=asc").text
+        assert 'Сбросить всё' in client.get("/?search=7999&status=Новый").text
+        assert 'Сбросить всё' in client.get("/?search=7999&sort=name").text
+        assert '<a class="button button-reset-filters" href="/">Сбросить всё</a>' in by_text_and_date.text
 
         assert "Иван" in by_contact.text and "Анна" not in by_contact.text
         assert "Иван" in by_text_and_date.text and "Анна" not in by_text_and_date.text
@@ -722,6 +810,7 @@ def test_initialize_migrates_status_column(tmp_path: Path):
     lead = database.get_lead(1)
     assert lead is not None
     assert lead["status"] == "Новый"
+    assert lead["updated_at"] is not None
     # Авто-тег «Новый» перенесён в статус и больше не дублируется.
     assert database.list_tags() == []
 
@@ -764,7 +853,9 @@ def test_lead_creation_time_is_rendered_without_microseconds(tmp_path: Path):
 
         detail = client.get(f"/leads/{lead_id}")
 
-        assert "05.10.2026 22:25:21" in detail.text
+        assert '<dd class="fact-datetime">' in detail.text
+        assert "05.10.2026" in detail.text
+        assert "22:25:21" in detail.text
         assert "866785" not in detail.text
 
 

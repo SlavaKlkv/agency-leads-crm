@@ -4,7 +4,50 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}{{ app_name }}{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}?v=9">
+    <style>.restoring-list-scroll body { visibility: hidden; }</style>
+    <script>
+      (() => {
+        try {
+          const savedScroll = JSON.parse(sessionStorage.getItem("lead-list-scroll") || "null");
+          if (!savedScroll || window.location.pathname !== "/" || Date.now() - savedScroll.savedAt > 15000) {
+            sessionStorage.removeItem("lead-list-scroll");
+            return;
+          }
+
+          document.documentElement.classList.add("restoring-list-scroll");
+          window.addEventListener("DOMContentLoaded", () => {
+            window.scrollTo({ top: Math.max(0, savedScroll.y), left: 0, behavior: "instant" });
+            sessionStorage.removeItem("lead-list-scroll");
+            document.documentElement.classList.remove("restoring-list-scroll");
+
+            if (savedScroll.anchor === "statuses") {
+              const statusFilters = document.querySelector("#lead-status-filters");
+              const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+              requestAnimationFrame(() => {
+                if (!statusFilters) return;
+                const desiredY = statusFilters.getBoundingClientRect().top + window.scrollY - 88;
+                const availableY = document.documentElement.scrollHeight - window.innerHeight;
+                const missingSpace = Math.max(0, desiredY - availableY);
+                if (missingSpace > 0) {
+                  const scrollSpace = document.createElement("div");
+                  scrollSpace.setAttribute("aria-hidden", "true");
+                  scrollSpace.style.height = `${missingSpace}px`;
+                  document.querySelector("[data-preserve-list-scroll]")?.append(scrollSpace);
+                }
+                statusFilters.scrollIntoView({
+                  block: "start",
+                  behavior: reduceMotion ? "auto" : "smooth",
+                });
+              });
+            }
+          }, { once: true });
+        } catch (error) {
+          sessionStorage.removeItem("lead-list-scroll");
+          document.documentElement.classList.remove("restoring-list-scroll");
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}?v=10">
   </head>
   <body>
     <header class="topbar">
@@ -20,11 +63,36 @@
       {% block content %}{% endblock %}
     </main>
     <script>
+      let lastInteractionWasPointer = false;
+      document.addEventListener("pointerdown", () => {
+        lastInteractionWasPointer = true;
+      }, { capture: true });
+
       document.addEventListener("keydown", (event) => {
-        if (event.key !== "Escape") return;
+        if (event.key !== "Escape") {
+          lastInteractionWasPointer = false;
+          return;
+        }
+
+        const blurPointerFocus = () => {
+          if (lastInteractionWasPointer && document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+        };
+
+        const openDialogs = document.querySelectorAll("dialog[open]");
+        const openDialog = openDialogs[openDialogs.length - 1];
+        if (openDialog) {
+          event.preventDefault();
+          openDialog.close();
+          requestAnimationFrame(blurPointerFocus);
+          return;
+        }
+
         document.querySelectorAll("details[open]").forEach((dropdown) => {
           dropdown.open = false;
         });
+        blurPointerFocus();
       });
     </script>
   </body>

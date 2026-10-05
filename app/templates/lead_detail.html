@@ -52,7 +52,20 @@
             </dd>
           </div>
           <div><dt>Срок</dt><dd>{{ lead.deadline.strftime('%d.%m.%Y') if lead.deadline else 'Не указан' }}</dd></div>
-          <div><dt>Создан</dt><dd>{{ lead.created_at.strftime('%d.%m.%Y %H:%M:%S') }}</dd></div>
+          <div>
+            <dt>Создан</dt>
+            <dd class="fact-datetime">
+              <span>{{ lead.created_at.strftime('%d.%m.%Y') }}</span>
+              <span>{{ lead.created_at.strftime('%H:%M:%S') }}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Обновлён</dt>
+            <dd class="fact-datetime">
+              <span>{{ lead.updated_at.strftime('%d.%m.%Y') }}</span>
+              <span>{{ lead.updated_at.strftime('%H:%M:%S') }}</span>
+            </dd>
+          </div>
         </dl>
       </aside>
     </div>
