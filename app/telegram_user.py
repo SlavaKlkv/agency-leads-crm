@@ -50,11 +50,13 @@ class TelegramUserService:
         api_id: int | None,
         api_hash: str,
         session: str = "",
+        enabled: bool = True,
     ) -> None:
         self.database = database
         self.api_id = api_id
         self.api_hash = api_hash.strip()
         self.session = session.strip()
+        self.enabled = enabled
         self.flow = TelegramUserFlow(database)
         self.client: TelegramClient | None = None
         self.authorized = False
@@ -62,7 +64,7 @@ class TelegramUserService:
 
     @property
     def configured(self) -> bool:
-        return bool(self.api_id and self.api_hash and self.session)
+        return bool(self.enabled and self.api_id and self.api_hash and self.session)
 
     @property
     def connected(self) -> bool:

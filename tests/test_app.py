@@ -536,6 +536,25 @@ def test_telegram_user_service_requires_session_to_be_configured(tmp_path: Path)
     assert service.connected is False
 
 
+def test_telegram_user_service_can_be_disabled_with_session_present(tmp_path: Path):
+    database = Database(f"sqlite:///{tmp_path / 'telegram-disabled.db'}")
+    database.initialize()
+    service = TelegramUserService(
+        database,
+        api_id=123,
+        api_hash="test-hash",
+        session="string-session",
+        enabled=False,
+    )
+    service._new_client = Mock()
+
+    asyncio.run(service.start())
+
+    assert service.configured is False
+    assert service.connected is False
+    service._new_client.assert_not_called()
+
+
 def test_telegram_user_service_starts_from_environment_session(tmp_path: Path):
     database = Database(f"sqlite:///{tmp_path / 'telegram-env-session.db'}")
     database.initialize()

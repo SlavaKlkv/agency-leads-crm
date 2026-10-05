@@ -17,6 +17,13 @@ def normalize_database_url(url: str) -> str:
     return url
 
 
+def env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str = "Leadroom"
@@ -27,6 +34,7 @@ class Settings:
     telegram_api_id: int | None = None
     telegram_api_hash: str = ""
     telegram_session: str = ""
+    telegram_user_enabled: bool = True
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -45,4 +53,5 @@ class Settings:
             telegram_api_id=int(telegram_api_id) if telegram_api_id else None,
             telegram_api_hash=os.getenv("TELEGRAM_API_HASH", ""),
             telegram_session=os.getenv("TELEGRAM_SESSION", ""),
+            telegram_user_enabled=env_flag("TELEGRAM_USER_ENABLED", default=True),
         )

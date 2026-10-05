@@ -37,6 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         api_id=app_settings.telegram_api_id,
         api_hash=app_settings.telegram_api_hash,
         session=app_settings.telegram_session,
+        enabled=app_settings.telegram_user_enabled,
     )
 
     @asynccontextmanager
@@ -328,6 +329,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "status": "ok",
             "bot_configured": bool(app_settings.telegram_bot_token),
             "public_url_configured": bool(app_settings.public_base_url),
+            "telegram_user_enabled": app_settings.telegram_user_enabled,
             "telegram_user_configured": telegram_user.configured,
             "telegram_user_connected": telegram_user.connected,
         }

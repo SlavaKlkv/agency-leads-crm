@@ -84,6 +84,7 @@ uv run uvicorn app.main:app --reload --env-file .env --port 8010
 | `TELEGRAM_API_ID` | API ID приложения с my.telegram.org | заполняется вручную |
 | `TELEGRAM_API_HASH` | API hash приложения Telegram | заполняется вручную |
 | `TELEGRAM_SESSION` | Строка сессии обычного Telegram-аккаунта | генерируется локально |
+| `TELEGRAM_USER_ENABLED` | Включает подключение обычного Telegram-аккаунта | `false` локально, `true` на Render |
 
 `TELEGRAM_WEBHOOK_SECRET` должен содержать от 1 до 256 символов: латинские буквы, цифры, `_` или `-`.
 
@@ -129,8 +130,10 @@ uv run python -m app.telegram_login generate
 
    Не импортируйте весь локальный `.env`: в нём могут быть локальный `DATABASE_URL` и другие значения, которые нельзя переносить на Render.
 
+   На Render задать `TELEGRAM_USER_ENABLED=true`. В локальном `.env` оставить `TELEGRAM_USER_ENABLED=false`, чтобы локальный сервер не подключал ту же StringSession одновременно с Render.
+
 5. Выбрать **Save and deploy**. Render перезапустит текущую сборку с новой переменной.
-6. Проверить `/health`: `telegram_user_connected` должен стать `true`.
+6. Проверить `/health`: `telegram_user_enabled` и `telegram_user_connected` должны стать `true`.
 
 `TELEGRAM_SESSION` даёт доступ к аккаунту. Её нельзя публиковать, добавлять в Git или передавать проверяющему. Для отключения нужно удалить `TELEGRAM_SESSION` из Render, выбрать **Save and deploy** и завершить сессию в Telegram → Настройки → Устройства.
 
