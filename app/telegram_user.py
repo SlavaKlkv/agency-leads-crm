@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from telethon import TelegramClient, events
@@ -9,6 +10,7 @@ from .db import Database
 
 
 TELEGRAM_SERVICE_USER_IDS = frozenset({777000})
+CONTINUATION_PREFIX = re.compile(r"^дополнение\s*:\s*", re.IGNORECASE)
 
 
 class TelegramUserError(RuntimeError):
@@ -32,13 +34,19 @@ class TelegramUserFlow:
     def process(self, message: IncomingTelegramMessage) -> tuple[int, bool]:
         username = (message.username or "").strip().lstrip("@")
         contact = f"@{username}" if username else f"Telegram ID: {message.chat_id}"
+        text = message.text.strip()
+        is_continuation = CONTINUATION_PREFIX.match(text) is not None
+        continuation_text = CONTINUATION_PREFIX.sub("", text, count=1).strip()
+        if is_continuation and continuation_text:
+            text = continuation_text
         return self.database.record_telegram_user_message(
             chat_id=message.chat_id,
             message_id=message.message_id,
             name=message.name.strip() or "Без имени",
             contact=contact,
-            text=message.text.strip(),
+            text=text,
             avatar=message.avatar,
+            continuation=is_continuation,
         )
 
 

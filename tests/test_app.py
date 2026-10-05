@@ -445,7 +445,7 @@ def test_telegram_webhook_rejects_wrong_secret(tmp_path: Path):
         assert response.status_code == 403
 
 
-def test_personal_telegram_messages_create_and_extend_one_lead(tmp_path: Path):
+def test_personal_telegram_continuation_extends_latest_lead(tmp_path: Path):
     database = Database(f"sqlite:///{tmp_path / 'telegram-user.db'}")
     database.initialize()
     flow = TelegramUserFlow(database)
@@ -468,7 +468,7 @@ def test_personal_telegram_messages_create_and_extend_one_lead(tmp_path: Path):
             message_id=11,
             name="Анна Петрова",
             username="anna",
-            text="Срок — две недели",
+            text="дополнение: Срок — две недели",
         )
     )
 
@@ -481,6 +481,36 @@ def test_personal_telegram_messages_create_and_extend_one_lead(tmp_path: Path):
     assert lead["request_text"] == "Нужен лендинг\n\nСрок — две недели"
     assert lead["tags"] == []
     assert lead["has_avatar"] is True
+
+
+def test_personal_telegram_message_without_prefix_creates_new_lead(tmp_path: Path):
+    database = Database(f"sqlite:///{tmp_path / 'telegram-new-lead.db'}")
+    database.initialize()
+    flow = TelegramUserFlow(database)
+
+    first_lead_id, _ = flow.process(
+        IncomingTelegramMessage(
+            chat_id="322",
+            message_id=12,
+            name="Анна Петрова",
+            username="anna",
+            text="Нужен лендинг",
+        )
+    )
+    second_lead_id, created = flow.process(
+        IncomingTelegramMessage(
+            chat_id="322",
+            message_id=13,
+            name="Анна Петрова",
+            username="anna",
+            text="Нужена также реклама",
+        )
+    )
+
+    assert created is True
+    assert second_lead_id != first_lead_id
+    assert database.get_lead(first_lead_id)["request_text"] == "Нужен лендинг"
+    assert database.get_lead(second_lead_id)["request_text"] == "Нужена также реклама"
 
 
 def test_telegram_avatar_is_rendered_and_served(tmp_path: Path):
