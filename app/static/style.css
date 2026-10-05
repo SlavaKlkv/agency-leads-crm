@@ -119,7 +119,7 @@ h1 { font-size: clamp(38px, 6vw, 58px); line-height: 0.98; letter-spacing: -0.05
   .lead-actions-buttons { opacity: 1; pointer-events: auto; }
 }
 
-.lead-list { display: grid; gap: 12px; }
+.lead-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
 .pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px; color: var(--muted); }
 .pagination-summary { margin: 0; font-size: 14px; }
 .pagination-controls { display: flex; align-items: center; gap: 10px; }
@@ -132,7 +132,7 @@ h1 { font-size: clamp(38px, 6vw, 58px); line-height: 0.98; letter-spacing: -0.05
 .pagination-ellipsis { padding: 0 4px; color: var(--muted); font-weight: 700; }
 .pagination-per-page { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 700; }
 .pagination-per-page select { width: auto; padding: 8px 32px 8px 11px; }
-.lead-card { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: flex; align-items: center; gap: 18px; transition: transform 160ms ease, box-shadow 160ms ease; }
+.lead-card { position: relative; min-width: 0; max-width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: flex; align-items: center; gap: 18px; transition: transform 160ms ease, box-shadow 160ms ease; }
 .lead-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(28, 34, 48, 0.08); }
 .lead-card-body { position: static; flex: 1; min-width: 0; overflow: hidden; display: flex; justify-content: space-between; align-items: center; gap: 28px; }
 .lead-card-body::after { content: ""; position: absolute; inset: 0; }
@@ -142,7 +142,7 @@ h1 { font-size: clamp(38px, 6vw, 58px); line-height: 0.98; letter-spacing: -0.05
 .avatar-image { display: block; object-fit: cover; }
 .lead-card h2 { max-width: 100%; margin: 0 0 5px; overflow: hidden; font-size: 18px; text-overflow: ellipsis; white-space: nowrap; }
 .lead-card p { max-width: 100%; margin: 0; overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
-.lead-meta { display: grid; justify-items: end; gap: 9px; flex: 0 0 auto; }
+.lead-meta { display: grid; justify-items: end; gap: 9px; flex: 0 1 320px; min-width: 0; max-width: 320px; }
 .lead-actions { position: relative; z-index: 1; flex: 0 0 84px; width: 84px; display: grid; place-items: center; }
 .lead-hint { grid-area: 1 / 1; color: var(--muted); font-size: 22px; line-height: 1; opacity: 0.45; transition: opacity 140ms ease; }
 .lead-actions-buttons { grid-area: 1 / 1; display: flex; gap: 8px; opacity: 0; pointer-events: none; transition: opacity 140ms ease; }
@@ -156,8 +156,8 @@ h1 { font-size: clamp(38px, 6vw, 58px); line-height: 0.98; letter-spacing: -0.05
 .source-telegram_bot { background: var(--telegram); color: var(--telegram-ink); }
 .source-telegram_user { background: var(--telegram); color: var(--telegram-ink); }
 .source-manual { background: var(--manual); color: var(--manual-ink); }
-.tags { display: flex; gap: 6px; flex-wrap: wrap; }
-.tag { border: 0; background: var(--accent-soft); color: var(--accent-dark); padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.tags { display: flex; justify-content: flex-end; gap: 6px; flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.tag { max-width: 100%; overflow: hidden; border: 0; background: var(--accent-soft); color: var(--accent-dark); padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .status { display: inline-block; font-size: 12px; font-weight: 750; padding: 5px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-dark); }
 .status-warning { background: var(--warning); color: var(--warning-ink); }
 .status-success { background: var(--success); color: var(--success-ink); }
@@ -211,6 +211,13 @@ code { background: var(--accent-soft); border-radius: 5px; padding: 2px 5px; fon
 .facts dd { margin: 0; text-align: right; font-weight: 650; }
 .facts dd.source { line-height: 1.2; }
 .muted { color: var(--muted); }
+
+@media (max-width: 900px) {
+  .lead-card { flex-wrap: wrap; }
+  .lead-card-body { flex-basis: calc(100% - 102px); }
+  .lead-meta { flex: 1 0 100%; max-width: none; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+  .lead-meta .tags { width: auto; }
+}
 
 @media (max-width: 720px) {
   .topbar { height: 64px; padding: 0 18px; }
