@@ -167,6 +167,7 @@
           </div>
           <div class="lead-meta">
             <span class="status status-{{ lead.status_tone }}">{{ lead.status }}</span>
+            {% if lead.deadline %}<span class="deadline">Срок: {{ lead.deadline.strftime('%d.%m.%Y') }}</span>{% endif %}
             <span class="source source-{{ lead.source }}">
               {% if lead.source == 'telegram_bot' %}Telegram-бот{% elif lead.source == 'telegram_user' %}Telegram{% else %}Вручную{% endif %}
             </span>

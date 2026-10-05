@@ -164,6 +164,7 @@ h1 { font-size: clamp(38px, 6vw, 58px); line-height: 0.98; letter-spacing: -0.05
 .status-danger { background: var(--danger); color: var(--danger-ink); }
 .status-overdue { background: var(--overdue); color: var(--overdue-ink); }
 .status-neutral { background: var(--accent-soft); color: var(--accent-dark); }
+.deadline { color: var(--muted); font-size: 12px; font-weight: 650; }
 
 .empty-state { padding: 80px 24px; border: 1px dashed #cbd0d9; border-radius: 18px; text-align: center; background: rgba(255,255,255,.62); }
 .empty-icon { margin: 0 auto 18px; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 23px; }

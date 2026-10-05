@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 
 from app.config import Settings
-from app.db import Database
+from app.db import Database, Lead
 from app.main import create_app
 from app.telegram import TelegramAPIError, raise_for_telegram_error
 from app.telegram_login import save_session
@@ -694,6 +694,121 @@ def test_initialize_migrates_status_column(tmp_path: Path):
     assert lead["status"] == "Новый"
     # Авто-тег «Новый» перенесён в статус и больше не дублируется.
     assert database.list_tags() == []
+
+
+def test_deadline_is_saved_and_rendered(tmp_path: Path):
+    deadline = date.today() + timedelta(days=14)
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/leads",
+            data={
+                "name": "Анна",
+                "contact": "a@b.c",
+                "request_text": "Лендинг",
+                "status": "В работе",
+                "deadline": deadline.isoformat(),
+            },
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 303
+        lead = client.app.state.database.get_lead(1)
+        assert lead is not None
+        assert lead["deadline"] == deadline
+        assert deadline.strftime("%d.%m.%Y") in client.get("/leads/1").text
+
+
+def test_lead_creation_time_is_rendered_without_microseconds(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        lead_id = client.app.state.database.create_lead(
+            name="Анна",
+            contact="a@b.c",
+            request_text="Лендинг",
+            source="manual",
+        )
+        with client.app.state.database.session() as session:
+            session.get(Lead, lead_id).created_at = datetime(
+                2026, 10, 5, 22, 25, 21, 866785
+            )
+            session.commit()
+
+        detail = client.get(f"/leads/{lead_id}")
+
+        assert "05.10.2026 22:25:21" in detail.text
+        assert "866785" not in detail.text
+
+
+def test_overdue_status_is_computed_and_previous_status_returns(tmp_path: Path):
+    expired_deadline = date.today() - timedelta(days=1)
+    with make_client(tmp_path) as client:
+        response = client.post(
+            "/leads",
+            data={
+                "name": "Анна",
+                "contact": "a@b.c",
+                "request_text": "Лендинг",
+                "status": "В работе",
+                "deadline": expired_deadline.isoformat(),
+            },
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 303
+        lead = client.app.state.database.get_lead(1)
+        assert lead is not None
+        assert lead["status"] == "Просрочен"
+        assert lead["workflow_status"] == "В работе"
+        assert "Анна" in client.get("/?status=Просрочен").text
+        assert "Анна" not in client.get("/?status=В+работе").text
+
+        edit_form = client.get("/leads/1/edit")
+        assert '<option value="Просрочен"' not in edit_form.text
+        assert '<option value="В работе" selected' in edit_form.text
+
+        future_deadline = date.today() + timedelta(days=1)
+        updated = client.post(
+            "/leads/1",
+            data={
+                "name": "Анна",
+                "contact": "a@b.c",
+                "request_text": "Лендинг",
+                "status": "В работе",
+                "deadline": future_deadline.isoformat(),
+            },
+            follow_redirects=False,
+        )
+        assert updated.status_code == 303
+        lead = client.app.state.database.get_lead(1)
+        assert lead is not None
+        assert lead["status"] == "В работе"
+        assert lead["workflow_status"] == "В работе"
+
+
+def test_initialize_adds_expired_deadline_to_existing_overdue_lead(tmp_path: Path):
+    db_path = tmp_path / "legacy-overdue.db"
+    url = f"sqlite:///{db_path}"
+    database = Database(url)
+    database.initialize()
+    lead_id = database.create_lead(
+        name="Анна",
+        contact="a@b.c",
+        request_text="Лендинг",
+        source="manual",
+        status="В работе",
+    )
+    with database.engine.begin() as connection:
+        connection.execute(
+            text("UPDATE leads SET status = 'Просрочен', deadline = NULL WHERE id = :id"),
+            {"id": lead_id},
+        )
+
+    database.initialize()
+
+    lead = database.get_lead(lead_id)
+    assert lead is not None
+    assert lead["deadline"] == date.today() - timedelta(days=1)
+    assert lead["status"] == "Просрочен"
+    assert lead["workflow_status"] == "В работе"
 
 
 def test_telegram_api_error_does_not_expose_bot_token():

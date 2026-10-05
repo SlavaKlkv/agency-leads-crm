@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .config import Settings
-from .db import DEFAULT_STATUS, LEAD_SOURCES, LEAD_STATUSES, Database
+from .db import DEFAULT_STATUS, LEAD_SOURCES, LEAD_STATUSES, WORKFLOW_STATUSES, Database
 from .telegram import TelegramAPIError, TelegramClient, TelegramFlow
 from .telegram_user import TelegramUserService
 
@@ -182,7 +182,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "new_lead.html",
             {
                 "app_name": app_settings.app_name,
-                "statuses": LEAD_STATUSES,
+                "statuses": WORKFLOW_STATUSES,
                 "default_status": DEFAULT_STATUS,
             },
         )
@@ -194,6 +194,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request_text: str = Form(min_length=1, max_length=4000),
         tags: str = Form(default=""),
         lead_status: str = Form(default=DEFAULT_STATUS, alias="status"),
+        deadline: date | None = Form(default=None),
     ):
         tag_names = [item.strip() for item in tags.split(",") if item.strip()]
         lead_id = database.create_lead(
@@ -203,6 +204,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             source="manual",
             tags=tag_names,
             status=lead_status,
+            deadline=deadline,
         )
         return RedirectResponse(f"/leads/{lead_id}", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -241,7 +243,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "lead": lead,
                 "tags_text": tags_text,
                 "app_name": app_settings.app_name,
-                "statuses": LEAD_STATUSES,
+                "statuses": WORKFLOW_STATUSES,
                 "default_status": DEFAULT_STATUS,
             },
         )
@@ -254,6 +256,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request_text: str = Form(min_length=1, max_length=4000),
         tags: str = Form(default=""),
         lead_status: str = Form(default=DEFAULT_STATUS, alias="status"),
+        deadline: date | None = Form(default=None),
     ):
         tag_names = [item.strip() for item in tags.split(",") if item.strip()]
         updated = database.update_lead(
@@ -263,6 +266,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             request_text=request_text,
             tags=tag_names,
             status=lead_status,
+            deadline=deadline,
         )
         if not updated:
             raise HTTPException(status_code=404, detail="Лид не найден")

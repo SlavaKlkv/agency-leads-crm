@@ -14,11 +14,15 @@ def tag_tone(_name: str) -> str:
 
 DEFAULT_STATUS = "Новый"
 
-LEAD_STATUSES = [
+WORKFLOW_STATUSES = [
     {"value": "Новый", "tone": "warning"},
     {"value": "В работе", "tone": "neutral"},
     {"value": "Успешно", "tone": "success"},
     {"value": "Отказ", "tone": "danger"},
+]
+
+LEAD_STATUSES = [
+    *WORKFLOW_STATUSES,
     {"value": "Просрочен", "tone": "overdue"},
 ]
 
@@ -32,6 +36,8 @@ LEAD_SOURCES = [
 ]
 
 _STATUS_TONES = {item["value"]: item["tone"] for item in LEAD_STATUSES}
+_WORKFLOW_STATUS_VALUES = {item["value"] for item in WORKFLOW_STATUSES}
+_OVERDUE_ELIGIBLE_STATUSES = {"Новый", "В работе"}
 
 
 def status_tone(name: str) -> str:
@@ -59,6 +65,7 @@ class Lead(Base):
     request_text: Mapped[str] = mapped_column(Text)
     source: Mapped[str] = mapped_column(String(32))
     status: Mapped[str] = mapped_column(String(32), default=DEFAULT_STATUS, server_default=DEFAULT_STATUS)
+    deadline: Mapped[date | None] = mapped_column(nullable=True)
     telegram_chat_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     avatar: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -106,7 +113,35 @@ class Database:
     def initialize(self) -> None:
         Base.metadata.create_all(self.engine)
         self._migrate_status_column()
+        self._migrate_deadline_column()
         self._migrate_avatar_column()
+
+    def _migrate_deadline_column(self) -> None:
+        """Добавляет срок и заполняет его для существующих просроченных лидов."""
+        inspector = inspect(self.engine)
+        if "leads" not in inspector.get_table_names():
+            return
+        columns = {column["name"] for column in inspector.get_columns("leads")}
+        with self.engine.begin() as connection:
+            if "deadline" not in columns:
+                _ = connection.execute(text("ALTER TABLE leads ADD COLUMN deadline DATE"))
+            _ = connection.execute(
+                text(
+                    "UPDATE leads SET deadline = :deadline "
+                    "WHERE status = :status AND deadline IS NULL"
+                ),
+                {
+                    "deadline": date.today() - timedelta(days=1),
+                    "status": "Просрочен",
+                },
+            )
+            _ = connection.execute(
+                text(
+                    "UPDATE leads SET status = :replacement "
+                    "WHERE status = :overdue"
+                ),
+                {"replacement": "В работе", "overdue": "Просрочен"},
+            )
 
     def _migrate_avatar_column(self) -> None:
         """Добавляет место для фото Telegram в уже созданную таблицу лидов."""
@@ -171,6 +206,7 @@ class Database:
         source: str,
         tags: list[str] | None = None,
         status: str = DEFAULT_STATUS,
+        deadline: date | None = None,
         telegram_chat_id: str | None = None,
         avatar: bytes | None = None,
         session: Session | None = None,
@@ -184,6 +220,7 @@ class Database:
                     source=source,
                     tags=tags,
                     status=status,
+                    deadline=deadline,
                     telegram_chat_id=telegram_chat_id,
                     avatar=avatar,
                     session=own_session,
@@ -195,6 +232,7 @@ class Database:
             request_text=request_text.strip(),
             source=source,
             status=self._normalize_status(status),
+            deadline=deadline,
             telegram_chat_id=telegram_chat_id,
             avatar=avatar,
         )
@@ -267,6 +305,7 @@ class Database:
         request_text: str,
         tags: list[str] | None = None,
         status: str | None = None,
+        deadline: date | None = None,
     ) -> bool:
         with self.session() as session:
             lead = session.scalar(
@@ -279,6 +318,7 @@ class Database:
             lead.request_text = request_text.strip()
             if status is not None:
                 lead.status = self._normalize_status(status)
+            lead.deadline = deadline
             if tags is not None:
                 lead.tags = []
                 for tag_name in tags:
@@ -300,7 +340,17 @@ class Database:
 
     @staticmethod
     def _normalize_status(status: str | None) -> str:
-        return status if status in _STATUS_TONES else DEFAULT_STATUS
+        return status if status in _WORKFLOW_STATUS_VALUES else DEFAULT_STATUS
+
+    @staticmethod
+    def _effective_status(status: str, deadline: date | None) -> str:
+        if (
+            status in _OVERDUE_ELIGIBLE_STATUSES
+            and deadline is not None
+            and deadline < date.today()
+        ):
+            return "Просрочен"
+        return status
 
     @staticmethod
     def _get_or_create_tag(session: Session, tag_name: str) -> Tag | None:
@@ -355,11 +405,12 @@ class Database:
 
     def list_statuses(self) -> list[dict]:
         with self.session() as session:
-            counts = dict(
-                session.execute(
-                    select(Lead.status, func.count(Lead.id)).group_by(Lead.status)
-                ).all()
-            )
+            counts: dict[str, int] = {}
+            for stored_status, deadline in session.execute(
+                select(Lead.status, Lead.deadline)
+            ).all():
+                effective_status = self._effective_status(stored_status, deadline)
+                counts[effective_status] = counts.get(effective_status, 0) + 1
             return [
                 {**status, "lead_count": counts.get(status["value"], 0)}
                 for status in LEAD_STATUSES
@@ -434,8 +485,17 @@ class Database:
                 .distinct()
             )
             statement = statement.where(Lead.id.in_(matching_leads))
-        if status in _STATUS_TONES:
+        overdue = (
+            Lead.deadline.is_not(None)
+            & (Lead.deadline < date.today())
+            & Lead.status.in_(_OVERDUE_ELIGIBLE_STATUSES)
+        )
+        if status == "Просрочен":
+            statement = statement.where(overdue)
+        elif status in _WORKFLOW_STATUS_VALUES:
             statement = statement.where(Lead.status == status)
+            if status in _OVERDUE_ELIGIBLE_STATUSES:
+                statement = statement.where(~overdue)
         selected_sources = list(dict.fromkeys(sources or []))
         source_values = {
             source_value
@@ -469,14 +529,17 @@ class Database:
 
     @staticmethod
     def _lead_dict(lead: Lead) -> dict:
+        effective_status = Database._effective_status(lead.status, lead.deadline)
         return {
             "id": lead.id,
             "name": lead.name,
             "contact": lead.contact,
             "request_text": lead.request_text,
             "source": lead.source,
-            "status": lead.status,
-            "status_tone": status_tone(lead.status),
+            "status": effective_status,
+            "workflow_status": lead.status,
+            "status_tone": status_tone(effective_status),
+            "deadline": lead.deadline,
             "telegram_chat_id": lead.telegram_chat_id,
             "has_avatar": lead.avatar is not None,
             "created_at": lead.created_at,

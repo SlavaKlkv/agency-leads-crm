@@ -24,9 +24,13 @@
         <span>Статус</span>
         <select name="status">
           {% for status in statuses %}
-            <option value="{{ status.value }}"{% if status.value == lead.status %} selected{% endif %}>{{ status.value }}</option>
+            <option value="{{ status.value }}"{% if status.value == lead.workflow_status %} selected{% endif %}>{{ status.value }}</option>
           {% endfor %}
         </select>
+      </label>
+      <label>
+        <span>Срок <span class="optional">(необязательно)</span></span>
+        <input type="date" name="deadline" value="{{ lead.deadline.isoformat() if lead.deadline else '' }}">
       </label>
       <label>
         <span>Теги</span>

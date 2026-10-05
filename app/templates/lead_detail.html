@@ -51,7 +51,8 @@
               {% if lead.source == 'telegram_bot' %}Telegram-бот{% elif lead.source == 'telegram_user' %}Telegram-аккаунт{% else %}Вручную{% endif %}
             </dd>
           </div>
-          <div><dt>Создан</dt><dd>{{ lead.created_at }}</dd></div>
+          <div><dt>Срок</dt><dd>{{ lead.deadline.strftime('%d.%m.%Y') if lead.deadline else 'Не указан' }}</dd></div>
+          <div><dt>Создан</dt><dd>{{ lead.created_at.strftime('%d.%m.%Y %H:%M:%S') }}</dd></div>
         </dl>
       </aside>
     </div>
