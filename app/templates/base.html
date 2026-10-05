@@ -13,12 +13,19 @@
         <span>{{ app_name }}</span>
       </a>
       <nav class="topbar-actions" aria-label="Основная навигация">
-        <a class="button button-secondary" href="/telegram">Telegram</a>
         <a class="button button-primary" href="/leads/new">Добавить лида</a>
       </nav>
     </header>
     <main class="shell">
       {% block content %}{% endblock %}
     </main>
+    <script>
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        document.querySelectorAll("details[open]").forEach((dropdown) => {
+          dropdown.open = false;
+        });
+      });
+    </script>
   </body>
 </html>

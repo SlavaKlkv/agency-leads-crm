@@ -19,7 +19,7 @@ services:
         sync: false
       - key: TELEGRAM_API_HASH
         sync: false
-      - key: TELEGRAM_ADMIN_PASSWORD
+      - key: TELEGRAM_SESSION
         sync: false
 
 databases:

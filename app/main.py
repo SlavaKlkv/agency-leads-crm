@@ -1,26 +1,30 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import date
 from pathlib import Path
 import secrets
 from urllib.parse import urlencode
 
-from fastapi import Depends, FastAPI, Form, Header, HTTPException, Query, Request, status
+from fastapi import FastAPI, Form, Header, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .config import Settings
 from .db import DEFAULT_STATUS, LEAD_SOURCES, LEAD_STATUSES, Database
 from .telegram import TelegramAPIError, TelegramClient, TelegramFlow
-from .telegram_user import TelegramUserError, TelegramUserService
+from .telegram_user import TelegramUserService
 
 
 APP_DIR = Path(__file__).parent
 DEFAULT_LEADS_PER_PAGE = 10
 LEADS_PER_PAGE_OPTIONS = (5, 10)
-telegram_admin_security = HTTPBasic(auto_error=False)
+LEAD_SORT_OPTIONS = (
+    ("newest", "Сначала новые"),
+    ("oldest", "Сначала старые"),
+)
+DEFAULT_LEAD_SORT = "newest"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -32,31 +36,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         database,
         api_id=app_settings.telegram_api_id,
         api_hash=app_settings.telegram_api_hash,
+        session=app_settings.telegram_session,
     )
-
-    def require_telegram_admin(
-        credentials: HTTPBasicCredentials | None = Depends(telegram_admin_security),
-    ) -> None:
-        expected_password = app_settings.telegram_admin_password
-        if not expected_password:
-            if app_settings.public_base_url:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Для подключения Telegram задайте TELEGRAM_ADMIN_PASSWORD.",
-                )
-            return
-        if (
-            credentials is None
-            or not secrets.compare_digest(credentials.username, "admin")
-            or not secrets.compare_digest(
-                credentials.password.encode(), expected_password.encode()
-            )
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Нужна авторизация администратора.",
-                headers={"WWW-Authenticate": "Basic"},
-            )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -83,6 +64,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         tag: list[int] = Query(default=[]),
         lead_status: str | None = Query(default=None, alias="status"),
         source: list[str] = Query(default=[]),
+        search: str = Query(default="", max_length=200),
+        created_from: str = Query(default=""),
+        created_to: str = Query(default=""),
+        sort: str = Query(default=DEFAULT_LEAD_SORT),
         page: int = Query(default=1, ge=1),
         per_page: int = Query(default=DEFAULT_LEADS_PER_PAGE),
     ):
@@ -98,7 +83,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         active_per_page = (
             per_page if per_page in LEADS_PER_PAGE_OPTIONS else DEFAULT_LEADS_PER_PAGE
         )
-        total_leads = database.count_leads(active_tags, active_status, active_sources)
+        active_sort = sort if sort in dict(LEAD_SORT_OPTIONS) else DEFAULT_LEAD_SORT
+        active_search = search.strip()
+        try:
+            active_created_from = date.fromisoformat(created_from) if created_from else None
+        except ValueError:
+            active_created_from = None
+        try:
+            active_created_to = date.fromisoformat(created_to) if created_to else None
+        except ValueError:
+            active_created_to = None
+        total_leads = database.count_leads(
+            active_tags, active_status, active_sources, active_search, active_created_from, active_created_to
+        )
         total_pages = max(1, (total_leads + active_per_page - 1) // active_per_page)
         current_page = min(page, total_pages)
 
@@ -125,6 +122,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if active_status is not None:
                 query.append(("status", active_status))
             query.extend(("source", source) for source in active_sources)
+            if active_search:
+                query.append(("search", active_search))
+            if active_created_from:
+                query.append(("created_from", active_created_from.isoformat()))
+            if active_created_to:
+                query.append(("created_to", active_created_to.isoformat()))
+            if active_sort != DEFAULT_LEAD_SORT:
+                query.append(("sort", active_sort))
             if active_per_page != DEFAULT_LEADS_PER_PAGE:
                 query.append(("per_page", active_per_page))
             query.append(("page", target_page))
@@ -138,6 +143,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     active_tags,
                     active_status,
                     active_sources,
+                    active_search,
+                    active_created_from,
+                    active_created_to,
+                    sort=active_sort,
                     limit=active_per_page,
                     offset=(current_page - 1) * active_per_page,
                 ),
@@ -156,6 +165,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "active_tags": active_tags,
                 "active_status": active_status,
                 "active_sources": active_sources,
+                "active_search": active_search,
+                "active_created_from": active_created_from.isoformat() if active_created_from else "",
+                "active_created_to": active_created_to.isoformat() if active_created_to else "",
+                "active_sort": active_sort,
+                "sort_options": LEAD_SORT_OPTIONS,
                 "app_name": app_settings.app_name,
             },
         )
@@ -308,67 +322,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except TelegramAPIError as error:
             raise HTTPException(status_code=502, detail=str(error)) from None
 
-    def telegram_account_context(request: Request, error: str = "", message: str = ""):
-        return {
-            "request": request,
-            "app_name": app_settings.app_name,
-            "telegram": telegram_user.status(),
-            "error": error,
-            "message": message,
-        }
-
-    @app.get("/telegram", response_class=HTMLResponse)
-    async def telegram_account(request: Request, _: None = Depends(require_telegram_admin)):
-        return templates.TemplateResponse(
-            request,
-            "telegram.html",
-            telegram_account_context(request),
-        )
-
-    @app.post("/telegram/send-code", response_class=HTMLResponse)
-    async def telegram_send_code(
-        request: Request,
-        phone: str = Form(),
-        _: None = Depends(require_telegram_admin),
-    ):
-        try:
-            await telegram_user.send_code(phone)
-            message = "Код отправлен в Telegram."
-            error = ""
-        except TelegramUserError as exc:
-            message = ""
-            error = str(exc)
-        return templates.TemplateResponse(
-            request,
-            "telegram.html",
-            telegram_account_context(request, error=error, message=message),
-        )
-
-    @app.post("/telegram/verify", response_class=HTMLResponse)
-    async def telegram_verify(
-        request: Request,
-        code: str = Form(default=""),
-        password: str = Form(default=""),
-        _: None = Depends(require_telegram_admin),
-    ):
-        try:
-            await telegram_user.verify(code, password)
-            message = "Telegram-аккаунт подключён."
-            error = ""
-        except TelegramUserError as exc:
-            message = ""
-            error = str(exc)
-        return templates.TemplateResponse(
-            request,
-            "telegram.html",
-            telegram_account_context(request, error=error, message=message),
-        )
-
-    @app.post("/telegram/disconnect")
-    async def telegram_disconnect(_: None = Depends(require_telegram_admin)):
-        await telegram_user.disconnect_account()
-        return RedirectResponse("/telegram", status_code=status.HTTP_303_SEE_OTHER)
-
     @app.get("/health")
     async def health():
         return {
@@ -377,7 +330,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "public_url_configured": bool(app_settings.public_base_url),
             "telegram_user_configured": telegram_user.configured,
             "telegram_user_connected": telegram_user.connected,
-            "telegram_admin_configured": bool(app_settings.telegram_admin_password),
         }
 
     return app

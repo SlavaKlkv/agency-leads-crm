@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 from typing import Iterator
 
 from sqlalchemy import Column, DateTime, ForeignKey, LargeBinary, String, Table, Text, create_engine, func, inspect, select, text
@@ -88,15 +88,6 @@ class TelegramUpdate(Base):
 
     update_id: Mapped[int] = mapped_column(primary_key=True)
     processed_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-
-
-class TelegramAccount(Base):
-    __tablename__ = "telegram_accounts"
-
-    id: Mapped[int] = mapped_column(primary_key=True, default=1)
-    phone: Mapped[str] = mapped_column(String(32))
-    encrypted_session: Mapped[str] = mapped_column(Text)
-    connected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class TelegramUserMessage(Base):
@@ -214,41 +205,6 @@ class Database:
                 lead.tags.append(tag)
         session.flush()
         return lead.id
-
-    def save_telegram_account(self, phone: str, encrypted_session: str) -> None:
-        with self.session() as session:
-            account = session.get(TelegramAccount, 1)
-            if account is None:
-                session.add(
-                    TelegramAccount(
-                        id=1,
-                        phone=phone.strip(),
-                        encrypted_session=encrypted_session,
-                    )
-                )
-            else:
-                account.phone = phone.strip()
-                account.encrypted_session = encrypted_session
-                account.connected_at = datetime.now()
-
-    def get_telegram_account(self) -> dict | None:
-        with self.session() as session:
-            account = session.get(TelegramAccount, 1)
-            if account is None:
-                return None
-            return {
-                "phone": account.phone,
-                "encrypted_session": account.encrypted_session,
-                "connected_at": account.connected_at,
-            }
-
-    def delete_telegram_account(self) -> bool:
-        with self.session() as session:
-            account = session.get(TelegramAccount, 1)
-            if account is None:
-                return False
-            session.delete(account)
-            return True
 
     def record_telegram_user_message(
         self,
@@ -429,15 +385,22 @@ class Database:
         tag_ids: list[int] | None = None,
         status: str | None = None,
         sources: list[str] | None = None,
+        search: str = "",
+        created_from: date | None = None,
+        created_to: date | None = None,
         *,
+        sort: str = "newest",
         limit: int | None = None,
         offset: int = 0,
     ) -> list[dict]:
         with self.session() as session:
-            statement = self._filtered_leads_statement(tag_ids, status, sources).options(
+            statement = self._filtered_leads_statement(tag_ids, status, sources, search, created_from, created_to).options(
                 selectinload(Lead.tags)
             )
-            statement = statement.order_by(Lead.created_at.desc(), Lead.id.desc())
+            if sort == "oldest":
+                statement = statement.order_by(Lead.created_at.asc(), Lead.id.asc())
+            else:
+                statement = statement.order_by(Lead.created_at.desc(), Lead.id.desc())
             if limit is not None:
                 statement = statement.limit(limit).offset(offset)
             return [self._lead_dict(lead) for lead in session.scalars(statement).all()]
@@ -447,16 +410,20 @@ class Database:
         tag_ids: list[int] | None = None,
         status: str | None = None,
         sources: list[str] | None = None,
+        search: str = "",
+        created_from: date | None = None,
+        created_to: date | None = None,
     ) -> int:
         with self.session() as session:
-            statement = self._filtered_leads_statement(tag_ids, status, sources).with_only_columns(
+            statement = self._filtered_leads_statement(tag_ids, status, sources, search, created_from, created_to).with_only_columns(
                 func.count(Lead.id)
             ).order_by(None)
             return session.scalar(statement) or 0
 
     @staticmethod
     def _filtered_leads_statement(
-        tag_ids: list[int] | None, status: str | None, sources: list[str] | None = None
+        tag_ids: list[int] | None, status: str | None, sources: list[str] | None = None,
+        search: str = "", created_from: date | None = None, created_to: date | None = None,
     ):
         statement = select(Lead)
         selected_tag_ids = list(dict.fromkeys(tag_ids or []))
@@ -478,6 +445,17 @@ class Database:
         }
         if source_values:
             statement = statement.where(Lead.source.in_(source_values))
+        if search:
+            pattern = f"%{search}%"
+            statement = statement.where(
+                Lead.name.ilike(pattern) | Lead.contact.ilike(pattern) | Lead.request_text.ilike(pattern)
+            )
+        if created_from:
+            statement = statement.where(Lead.created_at >= datetime.combine(created_from, time.min))
+        if created_to:
+            statement = statement.where(
+                Lead.created_at < datetime.combine(created_to + timedelta(days=1), time.min)
+            )
         return statement
 
     def get_lead(self, lead_id: int) -> dict | None:

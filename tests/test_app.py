@@ -1,7 +1,8 @@
 import asyncio
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
@@ -12,6 +13,7 @@ from app.config import Settings
 from app.db import Database
 from app.main import create_app
 from app.telegram import TelegramAPIError, raise_for_telegram_error
+from app.telegram_login import save_session
 from app.telegram_user import IncomingTelegramMessage, TelegramUserFlow, TelegramUserService
 
 
@@ -34,6 +36,10 @@ def telegram_update(update_id: int, chat_id: int, text: str | None = None, conta
 
 def test_manual_lead_tags_and_filter(tmp_path: Path):
     with make_client(tmp_path) as client:
+        landing = client.get("/")
+        assert 'document.querySelectorAll("details[open]")' in landing.text
+        assert 'event.key !== "Escape"' in landing.text
+
         response = client.post(
             "/leads",
             data={
@@ -239,6 +245,42 @@ def test_leads_pagination_preserves_filters(tmp_path: Path):
         assert "Показано 11–12 из 12" in second_page.text
         assert 'class="pagination-page active" aria-current="page">2' in second_page.text
         assert f'href="/?tag={tag_id}&amp;status=%D0%92+%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%B5&amp;page=1"' in second_page.text
+
+
+def test_leads_can_be_sorted_oldest_first_and_preserve_filters(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        for number in range(3):
+            client.app.state.database.create_lead(
+                name=f"Лид №{number}", contact=f"lead{number}@example.com", request_text="Запрос", source="manual"
+            )
+
+        page = client.get("/?sort=oldest")
+
+        assert page.status_code == 200
+        assert page.text.index("Лид №0") < page.text.index("Лид №2")
+        assert '<option value="oldest" selected>Сначала старые</option>' in page.text
+        assert 'name="sort" value="oldest"' in page.text
+
+
+def test_leads_can_be_filtered_by_search_and_created_date_range(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        first = client.app.state.database.create_lead(
+            name="Анна", contact="anna@example.com", request_text="Нужен лендинг", source="manual"
+        )
+        second = client.app.state.database.create_lead(
+            name="Иван", contact="+79990000000", request_text="Нужна реклама", source="manual"
+        )
+        with client.app.state.database.session() as session:
+            from app.db import Lead
+
+            session.get(Lead, first).created_at = datetime(2026, 10, 1, 12, 0)
+            session.get(Lead, second).created_at = datetime(2026, 10, 3, 12, 0)
+
+        by_contact = client.get("/?search=7999")
+        by_text_and_date = client.get("/?search=%D1%80%D0%B5%D0%BA%D0%BB%D0%B0%D0%BC%D0%B0&created_from=2026-10-03&created_to=2026-10-03")
+
+        assert "Иван" in by_contact.text and "Анна" not in by_contact.text
+        assert "Иван" in by_text_and_date.text and "Анна" not in by_text_and_date.text
 
 
 def test_leads_pagination_shows_direct_links_for_long_lists(tmp_path: Path):
@@ -482,37 +524,57 @@ def test_personal_telegram_duplicate_message_is_ignored(tmp_path: Path):
     assert database.get_lead(first[0])["request_text"] == "Нужна реклама"
 
 
-def test_telegram_user_service_does_not_mark_sent_code_as_connected(tmp_path: Path):
+def test_telegram_user_service_requires_session_to_be_configured(tmp_path: Path):
     database = Database(f"sqlite:///{tmp_path / 'telegram-service.db'}")
     database.initialize()
     service = TelegramUserService(database, api_id=123, api_hash="test-hash")
 
-    service.pending_phone = "+79990000000"
-    service.pending_phone_code_hash = "pending-code"
-
-    assert service.awaiting_code is True
+    assert service.configured is False
     assert service.connected is False
 
 
-def test_telegram_page_requires_admin_password_on_public_service(tmp_path: Path):
+def test_telegram_user_service_starts_from_environment_session(tmp_path: Path):
+    database = Database(f"sqlite:///{tmp_path / 'telegram-env-session.db'}")
+    database.initialize()
+    service = TelegramUserService(
+        database,
+        api_id=123,
+        api_hash="test-hash",
+        session="string-session",
+    )
+    client = SimpleNamespace(
+        connect=AsyncMock(),
+        disconnect=AsyncMock(),
+        is_user_authorized=AsyncMock(return_value=True),
+        add_event_handler=Mock(),
+    )
+    service._new_client = Mock(return_value=client)
+
+    asyncio.run(service.start())
+
+    service._new_client.assert_called_once_with("string-session")
+    assert service.configured is True
+    assert service.connected is True
+    asyncio.run(service.stop())
+
+
+def test_generated_telegram_session_is_saved_to_env_file(tmp_path: Path):
+    env_path = tmp_path / ".env"
+
+    save_session("string-session", env_path)
+
+    assert env_path.read_text() == "TELEGRAM_SESSION='string-session'\n"
+
+
+def test_telegram_account_setup_is_not_available_in_web_ui(tmp_path: Path):
     settings = Settings(
         database_url=f"sqlite:///{tmp_path / 'telegram-admin.db'}",
         public_base_url="https://leadroom.example",
-        telegram_admin_password="correct-password",
     )
     with TestClient(create_app(settings)) as client:
-        assert client.get("/telegram").status_code == 401
-        assert client.get("/telegram", auth=("admin", "wrong-password")).status_code == 401
-        assert client.get("/telegram", auth=("admin", "correct-password")).status_code == 200
-
-
-def test_public_telegram_page_is_disabled_without_admin_password(tmp_path: Path):
-    settings = Settings(
-        database_url=f"sqlite:///{tmp_path / 'telegram-admin-missing.db'}",
-        public_base_url="https://leadroom.example",
-    )
-    with TestClient(create_app(settings)) as client:
-        assert client.get("/telegram").status_code == 503
+        assert client.get("/telegram").status_code == 404
+        assert client.post("/telegram/send-code", data={"phone": "+79990000000"}).status_code == 404
+        assert 'href="/telegram"' not in client.get("/").text
 
 
 def test_telegram_service_account_message_is_ignored(tmp_path: Path):
