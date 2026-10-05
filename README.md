@@ -111,17 +111,23 @@ curl http://127.0.0.1:8000/health
 
 ## Подключение обычного Telegram
 
-Обычный Telegram-аккаунт подключает разработчик. Формы входа в веб-интерфейсе нет.
+Обычный Telegram-аккаунт подключает разработчик. Формы входа в веб-интерфейсе нет. Локальный сервер и Render не должны одновременно использовать одну StringSession: для обычной работы приём сообщений включается только на Render.
 
 1. Создать API-приложение на [my.telegram.org](https://my.telegram.org/) и получить `API_ID` и `API_HASH`.
-2. Задать в локальном `.env` значения `TELEGRAM_API_ID` и `TELEGRAM_API_HASH`.
+2. Задать в локальном `.env` значения `TELEGRAM_API_ID`, `TELEGRAM_API_HASH` и `TELEGRAM_USER_ENABLED=false`.
 3. Сгенерировать строку сессии:
 
 ```bash
 uv run python -m app.telegram_login generate
 ```
 
-Команда последовательно запросит номер, код из Telegram и, если нужно, пароль 2FA. Полученная строка будет автоматически записана в `TELEGRAM_SESSION` в том же `.env` и выведена в терминал для копирования.
+Команда последовательно запросит:
+
+- номер телефона в международном формате;
+- код, присланный Telegram;
+- пароль 2FA, если он включён.
+
+Генератор работает независимо от `TELEGRAM_USER_ENABLED=false`: переключатель запрещает фоновое подключение локальной CRM, но не мешает создать сессию. Полученная строка автоматически записывается в `TELEGRAM_SESSION` в том же `.env` и выводится в терминал для копирования.
 
 4. В Render Dashboard открыть Web Service → **Environment** и добавить сессию одним из способов:
 
@@ -130,10 +136,17 @@ uv run python -m app.telegram_login generate
 
    Не импортируйте весь локальный `.env`: в нём могут быть локальный `DATABASE_URL` и другие значения, которые нельзя переносить на Render.
 
-   На Render задать `TELEGRAM_USER_ENABLED=true`. В локальном `.env` оставить `TELEGRAM_USER_ENABLED=false`, чтобы локальный сервер не подключал ту же StringSession одновременно с Render.
+   На Render должны быть заданы `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION` и `TELEGRAM_USER_ENABLED=true`. В локальном `.env` нужно оставить `TELEGRAM_USER_ENABLED=false`, чтобы локальный сервер не подключал ту же StringSession одновременно с Render.
 
 5. Выбрать **Save and deploy**. Render перезапустит текущую сборку с новой переменной.
 6. Проверить `/health`: `telegram_user_enabled` и `telegram_user_connected` должны стать `true`.
+
+Расшифровка статуса `/health`:
+
+- `telegram_user_enabled: false` — приём личных сообщений выключен переключателем;
+- `telegram_user_enabled: true`, `telegram_user_configured: false` — не задана одна из трёх переменных: API ID, API hash или сессия;
+- `telegram_user_configured: true`, `telegram_user_connected: false` — параметры есть, но подключение к Telegram не установлено; сначала нужно перезапустить Render, а если статус не изменился — создать новую StringSession и заменить `TELEGRAM_SESSION`;
+- `telegram_user_connected: true` — аккаунт подключён; окончательная проверка — новое личное сообщение от другого обычного аккаунта и появление лида в CRM.
 
 `TELEGRAM_SESSION` даёт доступ к аккаунту. Её нельзя публиковать, добавлять в Git или передавать проверяющему. Для отключения нужно удалить `TELEGRAM_SESSION` из Render, выбрать **Save and deploy** и завершить сессию в Telegram → Настройки → Устройства.
 
@@ -189,13 +202,17 @@ docker compose down
 > [!NOTE]
 > Web service работает на бесплатном тарифе Render и засыпает после 15 минут без входящих запросов. Поэтому при первом открытии публичной ссылки Render может показать экран `Waking up` и запускать приложение около минуты. Это штатное ограничение тарифа, а не ошибка приложения; после запуска достаточно обновить страницу. Подробнее — в [документации Render](https://render.com/docs/free#spinning-down-on-idle).
 
+> [!WARNING]
+> Когда Free Web Service спит, фоновый MTProto-клиент не работает, а входящее Telegram-сообщение само по себе не будит Render. Для демонстрации сначала откройте CRM, дождитесь запуска и проверьте `telegram_user_connected: true`, и только после этого отправьте новое личное сообщение. Для постоянного приёма заявок нужен постоянно работающий сервис.
+
 После создания сервисов нужно:
 
 1. указать `TELEGRAM_BOT_TOKEN`;
 2. указать публичный адрес сервиса в `PUBLIC_BASE_URL`;
 3. дождаться успешного health check;
 4. один раз вызвать `POST /api/telegram/setup`;
-5. отправить реальную заявку боту и убедиться, что лид с тегами появился в CRM.
+5. для обычного Telegram-аккаунта указать `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION` и `TELEGRAM_USER_ENABLED=true`;
+6. проверить `/health`, затем отправить новую реальную заявку и убедиться, что лид появился в CRM.
 
 ## Структура проекта
 
