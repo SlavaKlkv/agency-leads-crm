@@ -47,7 +47,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}?v=10">
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}?v=13">
   </head>
   <body>
     <header class="topbar">
@@ -66,11 +66,13 @@
       let lastInteractionWasPointer = false;
       document.addEventListener("pointerdown", () => {
         lastInteractionWasPointer = true;
+        document.documentElement.classList.remove("keyboard-navigation");
       }, { capture: true });
 
       document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") {
           lastInteractionWasPointer = false;
+          document.documentElement.classList.add("keyboard-navigation");
           return;
         }
 

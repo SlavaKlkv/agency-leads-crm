@@ -37,7 +37,7 @@ button, input, textarea, select { font: inherit; }
 input[type="date"]:not(:disabled) { cursor: text; }
 button:not(:disabled), select:not(:disabled), input[type="checkbox"]:not(:disabled), input[type="radio"]:not(:disabled), input[type="date"]:not(:disabled)::-webkit-calendar-picker-indicator { cursor: pointer; }
 :where(a, button, summary):focus { outline: none; }
-:where(a, button, summary):focus-visible { outline: 3px solid rgba(45, 48, 55, 0.18); outline-offset: 2px; }
+.keyboard-navigation :where(a, button, summary):focus { outline: 3px solid rgba(45, 48, 55, 0.18); outline-offset: 2px; }
 
 .topbar {
   height: 72px;
@@ -195,6 +195,8 @@ label { display: grid; gap: 10px; font-weight: 700; }
 label small { color: var(--muted); font-weight: 500; font-size: 13px; line-height: 1.4; }
 input, textarea, select { width: 100%; border: 1px solid #cfd4dc; border-radius: 10px; padding: 12px 13px; background: #fbfcfe; color: var(--ink); outline: none; }
 input:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(45,48,55,.12); }
+select:focus, input[type="date"]:focus { border-color: #cfd4dc; box-shadow: none; }
+.keyboard-navigation select:focus, .keyboard-navigation input[type="date"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(45,48,55,.12); }
 textarea { resize: vertical; line-height: 1.5; }
 .form-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 5px; }
 .page-header { max-width: 760px; }

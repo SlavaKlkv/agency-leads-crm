@@ -41,12 +41,14 @@ def test_manual_lead_tags_and_filter(tmp_path: Path):
         assert 'document.querySelectorAll("dialog[open]")' in landing.text
         assert 'lastInteractionWasPointer = true' in landing.text
         assert 'requestAnimationFrame(blurPointerFocus)' in landing.text
+        assert 'classList.remove("keyboard-navigation")' in landing.text
+        assert 'classList.add("keyboard-navigation")' in landing.text
         assert 'document.activeElement.blur()' in landing.text
         assert 'event.key !== "Escape"' in landing.text
         assert 'openDialog.close()' in landing.text
         assert 'deleteTagDialog.addEventListener("close"' in landing.text
         assert 'deleteLeadDialog.addEventListener("close"' in landing.text
-        assert '/style.css?v=10' in landing.text
+        assert '/style.css?v=13' in landing.text
         assert 'data-preserve-list-scroll' in landing.text
         assert 'sessionStorage.setItem("lead-list-scroll"' in landing.text
         assert 'id="lead-status-filters"' in landing.text
