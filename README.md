@@ -1,234 +1,86 @@
-# Leadroom
+<h1 align="center">Leadroom</h1>
 
-Мини-CRM для заявок агентства. Клиент оставляет имя, контакт и запрос через Telegram-бота, после чего заявка автоматически появляется в веб-интерфейсе. Менеджер также может создать лида вручную, назначить теги и отфильтровать список по тегам и статусам.
+Мини-CRM для заявок агентства. Обращения из Telegram-бота и личных сообщений подключённого аккаунта попадают в общий список; менеджер может добавить лида вручную, назначить теги и отслеживать работу по статусам.
 
-## Что реализовано
+## Технологии
 
-- пошаговый Telegram-диалог: имя → контакт → запрос;
-- кнопка Telegram для отправки номера телефона;
-- создание лида после завершения диалога;
-- источник Telegram без дублирующего автотега;
-- статус лида (`Новый`, `В работе`, `Успешно`, `Отказ`, `Просрочен`);
-- защита webhook секретным заголовком;
-- защита от повторной обработки одного Telegram update;
-- подключение обычного Telegram-аккаунта через MTProto;
-- создание лида из первого личного входящего сообщения;
-- добавление следующих сообщений собеседника к его лиду;
-- ручное создание лида в CRM;
-- редактирование и удаление лидов;
-- выбор статуса при создании и редактировании;
-- добавление и удаление тегов;
-- совместная фильтрация списка лидов по нескольким тегам и статусу;
-- PostgreSQL как основная база данных;
-- Dockerfile и Render Blueprint для развёртывания.
+<p align="center">
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.13-3776AB?logo=python&amp;logoColor=white" alt="Python 3.13"></a>
+  <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&amp;logoColor=white" alt="FastAPI 0.115+"></a>
+  <a href="https://jinja.palletsprojects.com/"><img src="https://img.shields.io/badge/Jinja-3.1+-B41717?logo=jinja&amp;logoColor=white" alt="Jinja 3.1+"></a>
+  <a href="https://www.sqlalchemy.org/"><img src="https://img.shields.io/badge/SQLAlchemy-2.0+-D71F00?logo=sqlalchemy&amp;logoColor=white" alt="SQLAlchemy 2.0+"></a>
+  <a href="https://www.postgresql.org/"><img src="https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&amp;logoColor=white" alt="PostgreSQL 17"></a>
+  <a href="https://docs.telethon.dev/"><img src="https://img.shields.io/badge/Telethon-1.40+-26A5E4?logo=telegram&amp;logoColor=white" alt="Telethon 1.40+"></a>
+  <a href="https://docs.pytest.org/"><img src="https://img.shields.io/badge/Pytest-8.3+-0A9EDC?logo=pytest&amp;logoColor=white" alt="Pytest 8.3+"></a>
+  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-containerized-2496ED?logo=docker&amp;logoColor=white" alt="Docker"></a>
+  <a href="https://render.com/"><img src="https://img.shields.io/badge/Render-deployed-000000?logo=render&amp;logoColor=white" alt="Render"></a>
+</p>
 
-## Стек
+**[Открыть работающую CRM](https://agency-leads-crm.onrender.com/)** · [Проверить состояние сервиса](https://agency-leads-crm.onrender.com/health)
 
-- Python 3.12+
-- FastAPI и Uvicorn
-- SQLAlchemy 2
-- PostgreSQL 17 и Psycopg 3
-- Jinja2 и серверный HTML
-- Telethon и MTProto
-- Telegram-сессия в секретной переменной окружения
-- Pytest
-- Docker и Docker Compose
+**Telegram-бот:** [@leadroom_agency_bot](https://t.me/leadroom_agency_bot)<br>**Telegram-аккаунт:** [@leadroom_agency_crm](https://t.me/leadroom_agency_crm)
 
-## Локальный запуск
+> На бесплатном Render первый запуск после простоя может занять около минуты. Сначала дождитесь открытия CRM, затем проверяйте получение новых сообщений из обычного Telegram: фоновый клиент работает только пока сервис активен.
 
-Понадобятся [uv](https://docs.astral.sh/uv/) и Docker.
+<p align="center">
+  <img src="docs/assets/crm_screen.png" alt="Список лидов Leadroom со статусами, поиском, фильтрами по источнику и тегам" width="960">
+</p>
 
-1. Установить зависимости:
+## Как проходит заявка
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/lead-flow-dark.svg">
+  <img src="docs/assets/lead-flow-light.svg" alt="Telegram-бот собирает имя, контакт и запрос; личное сообщение или ручной ввод тоже создают лида; все заявки попадают в CRM, где менеджер назначает теги и фильтрует список." width="960">
+</picture>
+
+Бот спрашивает имя, контакт и запрос. После последнего ответа лид появляется в CRM. Для проверки полного сценария откройте [бота](https://t.me/leadroom_agency_bot), отправьте `/start`, ответьте на три вопроса, затем найдите нового лида в CRM, добавьте ему тег и включите фильтр по этому тегу. Заявки в публичной демоверсии общие для всех посетителей.
+
+## Что умеет MVP
+
+| Канал | Результат |
+| --- | --- |
+| Telegram-бот | Пошаговая заявка с защитой webhook и повторной доставки сообщения |
+| Обычный Telegram | Первое личное сообщение создаёт лида; следующие дополняют обращение |
+| CRM | Ручное создание, изменение, удаление, статусы, теги, поиск и фильтры |
+
+Теги помогают группировать заявки; статус показывает этап обработки. Фильтр по нескольким тегам находит лидов с **любым** из выбранных тегов.
+
+## Запуск локально
+
+Нужны [uv](https://docs.astral.sh/uv/) и Docker. Настройки берутся из `.env.example`; реальные ключи и Telegram-сессию храните только в локальном `.env` или в секретах хостинга.
+
+Установите зависимости:
 
 ```bash
 uv sync
 ```
 
-2. Создать локальный файл настроек:
+Создайте настройки:
 
 ```bash
 cp .env.example .env
 ```
 
-Файл `.env` уже исключён из Git. Шаблон содержит локальное подключение к PostgreSQL на порту `55432`.
-
-3. Запустить PostgreSQL:
+Поднимите PostgreSQL:
 
 ```bash
 docker compose up -d db
 ```
 
-4. Запустить CRM с переменными из `.env`:
+Запустите приложение:
 
 ```bash
 uv run uvicorn app.main:app --reload --env-file .env
 ```
 
-После запуска CRM доступна по адресу [http://127.0.0.1:8000](http://127.0.0.1:8000), а проверка состояния — по адресу [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health).
-
-Если порт `8000` занят, можно выбрать другой:
+CRM откроется по адресу [http://127.0.0.1:8000](http://127.0.0.1:8000). Проверка:
 
 ```bash
-uv run uvicorn app.main:app --reload --env-file .env --port 8010
+uv run pytest -q
 ```
 
-## Настройки окружения
+Проверка: автоматические тесты покрывают создание и изменение лидов, теги, фильтры, сценарии Telegram-бота и подключённого обычного Telegram-аккаунта, а также защиту от повторной обработки сообщений. Для приёмки по заданию важен отдельный проход в живой версии: отправьте новое сообщение [боту](https://t.me/leadroom_agency_bot) и отдельное личное сообщение [подключённому Telegram-аккаунту](https://t.me/leadroom_agency_crm), затем убедитесь, что лиды появились в CRM.
 
-| Переменная | Назначение | Локальное значение |
-| --- | --- | --- |
-| `APP_NAME` | Название CRM в интерфейсе | `Leadroom` |
-| `DATABASE_URL` | Строка подключения SQLAlchemy к PostgreSQL | `postgresql+psycopg://postgres:postgres@localhost:55432/leadroom` |
-| `TELEGRAM_BOT_TOKEN` | Токен бота от BotFather | заполняется вручную |
-| `TELEGRAM_WEBHOOK_SECRET` | Секрет проверки запросов Telegram | заполняется вручную |
-| `PUBLIC_BASE_URL` | Публичный HTTPS-адрес без завершающего `/` | заполняется после развёртывания |
-| `TELEGRAM_API_ID` | API ID приложения с my.telegram.org | заполняется вручную |
-| `TELEGRAM_API_HASH` | API hash приложения Telegram | заполняется вручную |
-| `TELEGRAM_SESSION` | Строка сессии обычного Telegram-аккаунта | генерируется локально |
-| `TELEGRAM_USER_ENABLED` | Включает подключение обычного Telegram-аккаунта | `false` локально, `true` на Render |
+Подключение Telegram-бота, обычного аккаунта и развёртывание описаны в [руководстве по настройке](docs/operations.md).
 
-`TELEGRAM_WEBHOOK_SECRET` должен содержать от 1 до 256 символов: латинские буквы, цифры, `_` или `-`.
-
-## Подключение Telegram-бота
-
-1. Создать бота через BotFather и получить токен.
-2. Заполнить в `.env` значения `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` и `PUBLIC_BASE_URL`.
-3. Перезапустить приложение с обновлённым `.env`.
-4. Зарегистрировать webhook после публикации приложения:
-
-```bash
-curl -X POST https://your-domain.example/api/telegram/setup
-```
-
-Приложение зарегистрирует адрес `https://your-domain.example/api/telegram/webhook`. Каждый входящий запрос проверяется по заголовку `X-Telegram-Bot-Api-Secret-Token`.
-
-Проверить состояние приложения и наличие основных настроек можно через:
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-Значение `bot_configured: true` подтверждает только наличие токена в окружении. Работу Telegram следует отдельно проверить реальным сообщением боту и появлением лида в CRM.
-
-## Подключение обычного Telegram
-
-Обычный Telegram-аккаунт подключает разработчик. Формы входа в веб-интерфейсе нет. Локальный сервер и Render не должны одновременно использовать одну StringSession: для обычной работы приём сообщений включается только на Render.
-
-1. Создать API-приложение на [my.telegram.org](https://my.telegram.org/) и получить `API_ID` и `API_HASH`.
-2. Задать в локальном `.env` значения `TELEGRAM_API_ID`, `TELEGRAM_API_HASH` и `TELEGRAM_USER_ENABLED=false`.
-3. Сгенерировать строку сессии:
-
-```bash
-uv run python -m app.telegram_login generate
-```
-
-Команда последовательно запросит:
-
-- номер телефона в международном формате;
-- код, присланный Telegram;
-- пароль 2FA, если он включён.
-
-Генератор работает независимо от `TELEGRAM_USER_ENABLED=false`: переключатель запрещает фоновое подключение локальной CRM, но не мешает создать сессию. Полученная строка автоматически записывается в `TELEGRAM_SESSION` в том же `.env` и выводится в терминал для копирования.
-
-4. В Render Dashboard открыть Web Service → **Environment** и добавить сессию одним из способов:
-
-   - **Вручную:** нажать **Add Environment Variable**, указать ключ `TELEGRAM_SESSION` и целиком вставить строку из терминала.
-   - **Из `.env`:** нажать **Add from .env** и вставить только строку `TELEGRAM_SESSION=...` из локального `.env`.
-
-   Не импортируйте весь локальный `.env`: в нём могут быть локальный `DATABASE_URL` и другие значения, которые нельзя переносить на Render.
-
-   На Render должны быть заданы `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION` и `TELEGRAM_USER_ENABLED=true`. В локальном `.env` нужно оставить `TELEGRAM_USER_ENABLED=false`, чтобы локальный сервер не подключал ту же StringSession одновременно с Render.
-
-5. Выбрать **Save and deploy**. Render перезапустит текущую сборку с новой переменной.
-6. Проверить `/health`: `telegram_user_enabled` и `telegram_user_connected` должны стать `true`.
-
-Расшифровка статуса `/health`:
-
-- `telegram_user_enabled: false` — приём личных сообщений выключен переключателем;
-- `telegram_user_enabled: true`, `telegram_user_configured: false` — не задана одна из трёх переменных: API ID, API hash или сессия;
-- `telegram_user_configured: true`, `telegram_user_connected: false` — параметры есть, но подключение к Telegram не установлено; сначала нужно перезапустить Render, а если статус не изменился — создать новую StringSession и заменить `TELEGRAM_SESSION`;
-- `telegram_user_connected: true` — аккаунт подключён; окончательная проверка — новое личное сообщение от другого обычного аккаунта и появление лида в CRM.
-
-`TELEGRAM_SESSION` даёт доступ к аккаунту. Её нельзя публиковать, добавлять в Git или передавать проверяющему. Для отключения нужно удалить `TELEGRAM_SESSION` из Render, выбрать **Save and deploy** и завершить сессию в Telegram → Настройки → Устройства.
-
-Первое личное входящее сообщение создаёт лида, последующие добавляются к его запросу. Сервисный аккаунт Telegram `777000`, присылающий коды входа, игнорируется.
-
-## Тесты
-
-```bash
-uv run pytest
-```
-
-Тесты проверяют:
-
-- ручное создание лида;
-- редактирование и удаление лида;
-- назначение тегов и фильтрацию;
-- полный Telegram-сценарий от `/start` до создания лида;
-- источник Telegram без автотега и статус по умолчанию;
-- перенос авто-тега «Новый» в статус при миграции;
-- защиту от повторной доставки update;
-- отклонение webhook с неверным секретом.
-- создание лида из личного Telegram и добавление следующих сообщений;
-- защиту от повторной обработки MTProto-сообщения.
-
-Тестовый набор использует временную SQLite через тот же SQLAlchemy-слой. Рабочая и развёртываемая конфигурации используют PostgreSQL; подключение к ней дополнительно проверяется при локальном интеграционном запуске.
-
-## Docker
-
-Собрать образ приложения:
-
-```bash
-docker build -t agency-leads-crm:local .
-```
-
-Остановить локальную PostgreSQL:
-
-```bash
-docker compose down
-```
-
-Данные PostgreSQL находятся в именованном Docker volume `postgres_data` и сохраняются после обычного `docker compose down`.
-
-## Развёртывание на Render
-
-Файл [render.yaml](render.yaml) описывает:
-
-- Docker web service;
-- управляемую PostgreSQL;
-- автоматическую передачу `DATABASE_URL` приложению;
-- health check по `/health`;
-- секретные настройки Telegram.
-
-> [!NOTE]
-> Web service работает на бесплатном тарифе Render и засыпает после 15 минут без входящих запросов. Поэтому при первом открытии публичной ссылки Render может показать экран `Waking up` и запускать приложение около минуты. Это штатное ограничение тарифа, а не ошибка приложения; после запуска достаточно обновить страницу. Подробнее — в [документации Render](https://render.com/docs/free#spinning-down-on-idle).
-
-> [!WARNING]
-> Когда Free Web Service спит, фоновый MTProto-клиент не работает, а входящее Telegram-сообщение само по себе не будит Render. Для демонстрации сначала откройте CRM, дождитесь запуска и проверьте `telegram_user_connected: true`, и только после этого отправьте новое личное сообщение. Для постоянного приёма заявок нужен постоянно работающий сервис.
-
-После создания сервисов нужно:
-
-1. указать `TELEGRAM_BOT_TOKEN`;
-2. указать публичный адрес сервиса в `PUBLIC_BASE_URL`;
-3. дождаться успешного health check;
-4. один раз вызвать `POST /api/telegram/setup`;
-5. для обычного Telegram-аккаунта указать `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION` и `TELEGRAM_USER_ENABLED=true`;
-6. проверить `/health`, затем отправить новую реальную заявку и убедиться, что лид появился в CRM.
-
-## Структура проекта
-
-```text
-app/
-├── config.py       # переменные окружения
-├── db.py           # модели и операции SQLAlchemy
-├── main.py         # веб-маршруты и Telegram webhook
-├── telegram.py     # Telegram API и сценарий диалога
-├── telegram_user.py # MTProto и личные входящие сообщения
-├── static/         # стили интерфейса
-└── templates/      # HTML-шаблоны CRM
-tests/
-└── test_app.py     # пользовательские и интеграционные сценарии
-compose.yaml        # локальная PostgreSQL
-render.yaml         # публикация web service и PostgreSQL
-Dockerfile          # образ приложения
-SUBMISSION.md       # набросок продукта и разбор решения
-```
+Исходники приложения находятся в `app/`, сценарии проверок — в `tests/`, конфигурация локальной БД — в `compose.yaml`, публикация на Render — в `render.yaml`.

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 250" role="img" aria-labelledby="title desc">
+  <title id="title">Путь заявки в Leadroom</title>
+  <desc id="desc">Telegram-бот, личные сообщения и ручной ввод создают лидов в CRM. Менеджер назначает теги и статусы, ищет и фильтрует заявки.</desc>
+  <rect width="960" height="250" rx="20" fill="#f6f7f9"/>
+  <g font-family="Arial, sans-serif">
+    <text x="32" y="37" fill="#697180" font-size="13" font-weight="700" letter-spacing="1.5">ПУТЬ ЗАЯВКИ</text>
+    <rect x="32" y="60" width="226" height="158" rx="16" fill="#fff" stroke="#dce1e8"/>
+    <text x="54" y="93" fill="#17191f" font-size="19" font-weight="700">Telegram</text>
+    <text x="54" y="124" fill="#4b5563" font-size="14" font-weight="700">Бот</text>
+    <text x="54" y="146" fill="#697180" font-size="12">Имя → контакт → запрос</text>
+    <text x="54" y="184" fill="#4b5563" font-size="14" font-weight="700">Личные сообщения</text>
+    <path d="M268 139h40m-8-6 8 6-8 6" fill="none" stroke="#9aa3af" stroke-width="2"/>
+    <rect x="318" y="60" width="286" height="158" rx="16" fill="#fff" stroke="#dce1e8"/>
+    <text x="340" y="93" fill="#17191f" font-size="19" font-weight="700">Leadroom</text>
+    <text x="340" y="126" fill="#4b5563" font-size="14">Единый список лидов</text>
+    <rect x="340" y="145" width="84" height="28" rx="14" fill="#eceef1"/>
+    <text x="382" y="164" fill="#2d3037" font-size="12" font-weight="700" text-anchor="middle">Статус</text>
+    <rect x="433" y="145" width="67" height="28" rx="14" fill="#eceef1"/>
+    <text x="466" y="164" fill="#2d3037" font-size="12" font-weight="700" text-anchor="middle">Теги</text>
+    <text x="340" y="197" fill="#697180" font-size="13">+ ручное создание</text>
+    <path d="M614 139h40m-8-6 8 6-8 6" fill="none" stroke="#9aa3af" stroke-width="2"/>
+    <rect x="664" y="60" width="264" height="158" rx="16" fill="#fff" stroke="#dce1e8"/>
+    <text x="686" y="93" fill="#17191f" font-size="19" font-weight="700">Менеджер</text>
+    <text x="686" y="126" fill="#4b5563" font-size="14">Поиск и фильтры</text>
+    <text x="686" y="152" fill="#4b5563" font-size="14">Обработка по статусу</text>
+    <text x="686" y="178" fill="#4b5563" font-size="14">Группировка по тегам</text>
+  </g>
+</svg>
