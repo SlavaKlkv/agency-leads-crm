@@ -275,7 +275,6 @@ class Database:
         contact: str,
         text: str,
         avatar: bytes | None = None,
-        continuation: bool = False,
     ) -> tuple[int, bool]:
         with self.session() as session:
             message_key = {"chat_id": chat_id, "message_id": message_id}
@@ -290,16 +289,14 @@ class Database:
                 )
                 return (lead.id if lead else 0), False
 
-            lead = None
-            if continuation:
-                lead = session.scalar(
-                    select(Lead)
-                    .where(
-                        Lead.source == "telegram_user",
-                        Lead.telegram_chat_id == chat_id,
-                    )
-                    .order_by(Lead.id.desc())
+            lead = session.scalar(
+                select(Lead)
+                .where(
+                    Lead.source == "telegram_user",
+                    Lead.telegram_chat_id == chat_id,
                 )
+                .order_by(Lead.id.desc())
+            )
             created = lead is None
             if lead is None:
                 lead_id = self.create_lead(

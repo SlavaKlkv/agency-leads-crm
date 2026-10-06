@@ -2,7 +2,7 @@
 name = "agency-leads-crm"
 version = "0.1.0"
 description = "Мини-CRM для заявок агентства из Telegram и ручных обращений"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
   "fastapi>=0.115,<1",
   "httpx>=0.28,<1",
