@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .config import Settings
-from .db import DEFAULT_STATUS, LEAD_SOURCES, LEAD_STATUSES, WORKFLOW_STATUSES, Database
+from .db import ACTIVE_STATUS, DEFAULT_STATUS, LEAD_SOURCES, LEAD_STATUSES, WORKFLOW_STATUSES, Database
 from .telegram import TelegramAPIError, TelegramClient, TelegramFlow
 from .telegram_user import TelegramUserService
 
@@ -81,7 +81,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         active_tags = list(dict.fromkeys(tag))
         active_status = (
             lead_status
-            if any(item["value"] == lead_status for item in LEAD_STATUSES)
+            if lead_status == ACTIVE_STATUS
+            or any(item["value"] == lead_status for item in LEAD_STATUSES)
             else None
         )
         active_sources = list(

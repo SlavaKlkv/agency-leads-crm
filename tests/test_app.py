@@ -182,6 +182,53 @@ def test_leads_filter_by_source_combines_with_status_and_tags(tmp_path: Path):
         assert 'name="source" value="manual"' in filtered.text
 
 
+def test_active_status_includes_new_in_progress_and_overdue_leads(tmp_path: Path):
+    with make_client(tmp_path) as client:
+        database = client.app.state.database
+        database.create_lead(
+            name="Новый лид",
+            contact="new@example.com",
+            request_text="Новая заявка",
+            source="manual",
+            status="Новый",
+        )
+        database.create_lead(
+            name="Лид в работе",
+            contact="progress@example.com",
+            request_text="Текущая заявка",
+            source="manual",
+            status="В работе",
+        )
+        database.create_lead(
+            name="Просроченный лид",
+            contact="overdue@example.com",
+            request_text="Просроченная заявка",
+            source="manual",
+            status="В работе",
+            deadline=date.today() - timedelta(days=1),
+        )
+        database.create_lead(
+            name="Закрытый лид",
+            contact="done@example.com",
+            request_text="Закрытая заявка",
+            source="manual",
+            status="Успешно",
+        )
+
+        filtered = client.get("/?status=Активные")
+
+        assert "Новый лид" in filtered.text
+        assert "Лид в работе" in filtered.text
+        assert "Просроченный лид" in filtered.text
+        assert "Закрытый лид" not in filtered.text
+        assert 'class="filter status-filter status-filter-active active"' in filtered.text
+        assert "Активные <span>3</span>" in filtered.text
+        assert "Новые <span>1</span>" in filtered.text
+        assert "Успешные <span>1</span>" in filtered.text
+        assert "Отказы <span>0</span>" in filtered.text
+        assert "Просроченные <span>1</span>" in filtered.text
+
+
 def test_delete_lead_keeps_active_list_filters(tmp_path: Path):
     with make_client(tmp_path) as client:
         lead_id = client.app.state.database.create_lead(

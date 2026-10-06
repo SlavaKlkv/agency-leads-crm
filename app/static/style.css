@@ -8,6 +8,8 @@
   --accent: #2d3037;
   --accent-dark: #1f2126;
   --accent-soft: #eceef1;
+  --active-filter: #f1f2f4;
+  --work-filter: #e6e8ec;
   --telegram: #e5f2fb;
   --telegram-ink: #17648d;
   --warning: #fff2cc;
@@ -81,7 +83,8 @@ h1 { font-size: clamp(38px, 6vw, 58px); line-height: 0.98; letter-spacing: -0.05
 .status-filter-success:not(.active) { background: var(--success); color: var(--success-ink); border-color: transparent; }
 .status-filter-danger:not(.active) { background: var(--danger); color: var(--danger-ink); border-color: transparent; }
 .status-filter-overdue:not(.active) { background: var(--overdue); color: var(--overdue-ink); border-color: transparent; }
-.status-filter-neutral:not(.active) { background: var(--accent-soft); color: var(--accent-dark); border-color: transparent; }
+.status-filter-active:not(.active) { background: var(--active-filter); color: var(--accent-dark); border-color: transparent; }
+.status-filter-neutral:not(.active) { background: var(--work-filter); color: var(--accent-dark); border-color: transparent; }
 .filter-menus { display: flex; gap: 10px; flex: 0 0 auto; }
 .lead-sort { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--muted); font-size: 13px; font-weight: 700; white-space: nowrap; }
 .sort-select { position: relative; }

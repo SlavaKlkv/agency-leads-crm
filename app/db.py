@@ -13,17 +13,18 @@ def tag_tone(_name: str) -> str:
 
 
 DEFAULT_STATUS = "Новый"
+ACTIVE_STATUS = "Активные"
 
 WORKFLOW_STATUSES = [
-    {"value": "Новый", "tone": "warning"},
-    {"value": "В работе", "tone": "neutral"},
-    {"value": "Успешно", "tone": "success"},
-    {"value": "Отказ", "tone": "danger"},
+    {"value": "Новый", "label": "Новые", "tone": "warning"},
+    {"value": "В работе", "label": "В работе", "tone": "neutral"},
+    {"value": "Успешно", "label": "Успешные", "tone": "success"},
+    {"value": "Отказ", "label": "Отказы", "tone": "danger"},
 ]
 
 LEAD_STATUSES = [
     *WORKFLOW_STATUSES,
-    {"value": "Просрочен", "tone": "overdue"},
+    {"value": "Просрочен", "label": "Просроченные", "tone": "overdue"},
 ]
 
 LEAD_SOURCES = [
@@ -440,14 +441,25 @@ class Database:
     def list_statuses(self) -> list[dict]:
         with self.session() as session:
             counts: dict[str, int] = {}
+            active_count = 0
             for stored_status, deadline in session.execute(
                 select(Lead.status, Lead.deadline)
             ).all():
+                if stored_status in _OVERDUE_ELIGIBLE_STATUSES:
+                    active_count += 1
                 effective_status = self._effective_status(stored_status, deadline)
                 counts[effective_status] = counts.get(effective_status, 0) + 1
             return [
-                {**status, "lead_count": counts.get(status["value"], 0)}
-                for status in LEAD_STATUSES
+                {
+                    "value": ACTIVE_STATUS,
+                    "label": ACTIVE_STATUS,
+                    "tone": "active",
+                    "lead_count": active_count,
+                },
+                *(
+                    {**status, "lead_count": counts.get(status["value"], 0)}
+                    for status in LEAD_STATUSES
+                ),
             ]
 
     def list_sources(self) -> list[dict]:
@@ -551,7 +563,9 @@ class Database:
             & (Lead.deadline < date.today())
             & Lead.status.in_(_OVERDUE_ELIGIBLE_STATUSES)
         )
-        if status == "Просрочен":
+        if status == ACTIVE_STATUS:
+            statement = statement.where(Lead.status.in_(_OVERDUE_ELIGIBLE_STATUSES))
+        elif status == "Просрочен":
             statement = statement.where(overdue)
         elif status in _WORKFLOW_STATUS_VALUES:
             statement = statement.where(Lead.status == status)
